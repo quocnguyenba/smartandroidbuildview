@@ -532,7 +532,12 @@ class ModuleGroupNode(
         return childHierarchyNodes.sortedBy { it.displayName }.map { it.toTreeNode() }
     }
 
-    override fun contains(file: VirtualFile): Boolean = false
+    override fun contains(file: VirtualFile): Boolean {
+        // Check if any child hierarchy node contains this file
+        return getChildren().any { childNode ->
+            (childNode as? ProjectViewNode<*>)?.contains(file) == true
+        }
+    }
 }
 
 class RootProjectFilesNode(
@@ -597,7 +602,21 @@ class RootProjectFilesNode(
         return children
     }
 
-    override fun contains(file: VirtualFile): Boolean = false
+    override fun contains(file: VirtualFile): Boolean {
+        // Check if this file is one of the root project files
+        val project = myProject ?: return false
+        val basePath = project.basePath ?: return false
+        val baseDir = LocalFileSystem.getInstance().findFileByPath(basePath) ?: return false
+        
+        // Check if the file is in the root project directory
+        if (file.parent != baseDir && file.parent?.parent != baseDir) return false
+        
+        // Check if it's one of the known root files
+        val fileName = file.name
+        return ROOT_FILES.any { it == fileName || "$it.kts" == fileName } ||
+               file.path.endsWith("gradle/libs.versions.toml") ||
+               file.path.contains(".gradle/gradle.properties")
+    }
     override fun getSortKey(): Comparable<*> = "ZZZZ"
     override fun getWeight(): Int = 2000
 }

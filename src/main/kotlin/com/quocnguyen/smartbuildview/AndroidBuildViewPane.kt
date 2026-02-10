@@ -6,6 +6,7 @@ import com.intellij.ide.SelectInTarget
 import com.intellij.ide.projectView.impl.ProjectViewPane
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.psi.PsiManager
 import javax.swing.Icon
 
 /**
@@ -30,17 +31,24 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
     override fun supportsShowScratchesAndConsoles(): Boolean = false
 
     /**
-     * Create a custom SelectInTarget to prevent "Unexpected SelectInTarget" errors.
-     * Returns a proper SelectInTarget implementation specific to this pane.
+     * Create a custom SelectInTarget to enable "Select Opened File" functionality.
+     * This allows users to quickly locate the currently opened file in the tree view.
      */
     override fun createSelectInTarget(): SelectInTarget {
         return object : SelectInTarget {
             override fun canSelect(context: SelectInContext): Boolean {
-                return context.project == myProject
+                // Check if the file belongs to this project and is a valid file
+                return context.project == myProject && context.virtualFile.isValid
             }
 
             override fun selectIn(context: SelectInContext, requestFocus: Boolean) {
-                select(context.selectorInFile, context.virtualFile, requestFocus)
+                // Convert the virtual file to PSI and select it in the tree
+                val virtualFile = context.virtualFile
+                val psiFile = PsiManager.getInstance(myProject).findFile(virtualFile)
+                
+                // Select using the PSI element if available, otherwise use the virtual file
+                val toSelect = psiFile ?: virtualFile
+                select(toSelect, virtualFile, requestFocus)
             }
 
             override fun getToolWindowId(): String = "Project"
