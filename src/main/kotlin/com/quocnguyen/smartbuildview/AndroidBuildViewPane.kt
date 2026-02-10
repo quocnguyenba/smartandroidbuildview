@@ -1,6 +1,8 @@
 package com.quocnguyen.smartbuildview
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.SelectInContext
+import com.intellij.ide.SelectInTarget
 import com.intellij.ide.projectView.impl.ProjectViewPane
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
@@ -26,4 +28,28 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
 
     // Hide Scratches and Consoles from this view
     override fun supportsShowScratchesAndConsoles(): Boolean = false
+
+    /**
+     * Create a custom SelectInTarget to prevent "Unexpected SelectInTarget" errors.
+     * Returns a proper SelectInTarget implementation specific to this pane.
+     */
+    override fun createSelectInTarget(): SelectInTarget {
+        return object : SelectInTarget {
+            override fun canSelect(context: SelectInContext): Boolean {
+                return context.project == myProject
+            }
+
+            override fun selectIn(context: SelectInContext, requestFocus: Boolean) {
+                select(context.selectorInFile, context.virtualFile, requestFocus)
+            }
+
+            override fun getToolWindowId(): String = "Project"
+
+            override fun getMinorViewId(): String = ID
+
+            override fun getWeight(): Float = this@AndroidBuildViewPane.weight.toFloat()
+
+            override fun toString(): String = getTitle()
+        }
+    }
 }
