@@ -129,14 +129,13 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
         }
     }
 
+    /**
+     * Gets the module directory using public API.
+     * Uses ModuleRootManager to get content roots (the recommended public API approach).
+     */
     private fun getModuleDir(module: Module): VirtualFile? {
-        // Try content roots first (more reliable for modules like w3w-main)
         val contentRoots = ModuleRootManager.getInstance(module).contentRoots
-        if (contentRoots.isNotEmpty()) {
-            return contentRoots.first()
-        }
-        // Fallback to module file parent
-        return module.moduleFile?.parent
+        return contentRoots.firstOrNull()
     }
 }
 

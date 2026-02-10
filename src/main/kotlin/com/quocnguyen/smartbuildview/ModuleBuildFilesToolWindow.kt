@@ -113,8 +113,8 @@ class ModuleBuildFilesPanel(private val project: Project) : JPanel(BorderLayout(
             .sortedBy { it.name }
 
         for (module in modules) {
-            val moduleDir = module.moduleFile?.parent
-                ?: ModuleRootManager.getInstance(module).contentRoots.firstOrNull()
+            // Use public API to get module directory
+            val moduleDir = ModuleRootManager.getInstance(module).contentRoots.firstOrNull()
                 ?: continue
 
             // Check if this is a Gradle module

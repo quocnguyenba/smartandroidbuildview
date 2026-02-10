@@ -1,3 +1,4 @@
+import org.jetbrains.intellij.tasks.RunPluginVerifierTask
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
@@ -49,6 +50,22 @@ tasks {
     patchPluginXml {
         sinceBuild.set("241")
         untilBuild.set("") // No upper limit - compatible with all future versions
+    }
+
+    // Configure Plugin Verifier to test against specific IDE versions
+    runPluginVerifier {
+        ideVersions.set(listOf(
+            "2024.1",    // Minimum supported version
+            "2024.2",    // Test with newer version
+            "2024.3"     // Test with latest stable
+        ))
+        // Fail build if compatibility issues are found
+        failureLevel.set(
+            listOf(
+                RunPluginVerifierTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+                RunPluginVerifierTask.FailureLevel.INVALID_PLUGIN
+            )
+        )
     }
 
     signPlugin {

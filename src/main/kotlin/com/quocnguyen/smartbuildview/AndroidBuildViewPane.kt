@@ -24,10 +24,6 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
 
     override fun getWeight(): Int = 142 // Just after Android view (which is ~141)
 
-    override fun supportsSortByType(): Boolean = false
-
-    override fun supportsFoldersAlwaysOnTop(): Boolean = true
-
     // Hide Scratches and Consoles from this view
     override fun supportsShowScratchesAndConsoles(): Boolean = false
 }

@@ -235,12 +235,13 @@ class AndroidBuildModuleNode(
         }
     }
 
+    /**
+     * Gets the module directory using public API.
+     * Uses ModuleRootManager to get content roots (the recommended public API approach).
+     */
     private fun getModuleDir(): VirtualFile? {
         val contentRoots = ModuleRootManager.getInstance(module).contentRoots
-        if (contentRoots.isNotEmpty()) {
-            return contentRoots.first()
-        }
-        return module.moduleFile?.parent
+        return contentRoots.firstOrNull()
     }
 
     private fun findManifestFile(moduleDir: VirtualFile): VirtualFile? {
@@ -496,9 +497,13 @@ class AndroidBuildModuleWithChildrenNode(
         }
     }
 
+    /**
+     * Gets the module directory using public API.
+     * Uses ModuleRootManager to get content roots (the recommended public API approach).
+     */
     private fun getModuleDir(): VirtualFile? {
         val contentRoots = ModuleRootManager.getInstance(module).contentRoots
-        return contentRoots.firstOrNull() ?: module.moduleFile?.parent
+        return contentRoots.firstOrNull()
     }
 
     override fun contains(file: VirtualFile): Boolean {
