@@ -1,7 +1,11 @@
 <idea-plugin>
     <id>com.quocnguyen.smartbuildview</id>
     <name>Android + Build Files View</name>
-    <vendor email="quoc@example.com" url="https://github.com/quocnguyen">Quoc Nguyen</vendor>
+    <version>1.0.0</version>
+    <vendor email="ng.baquoc96@gmail.com" url="https://github.com/quocnguyenba">Quoc Nguyen</vendor>
+    
+    <!-- Specify IDE version compatibility (required) -->
+    <idea-version since-build="241"/>
 
     <description><![CDATA[
     Adds a new "Android + Build" view that shows the same structure as Android view, 
