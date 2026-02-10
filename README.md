@@ -22,7 +22,7 @@ An IntelliJ IDEA / Android Studio plugin that adds a new **"Android + Build"** p
 1. Clone this repository
 2. Open the project in IntelliJ IDEA
 3. Run `./gradlew buildPlugin`
-4. Install the plugin from `build/distributions/Android + Build Files View-1.0.0.zip`
+4. Install the plugin from `build/distributions/smart-android-build-files-view-x.x.x.zip`
 
 ### From JetBrains Marketplace
 
