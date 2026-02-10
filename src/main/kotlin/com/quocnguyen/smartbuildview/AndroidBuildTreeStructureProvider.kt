@@ -109,6 +109,12 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
         // Add Gradle Scripts (root project files) at the bottom
         result.add(RootProjectFilesNode(project, settings))
         
+        // Add External Libraries if enabled
+        val fileSettings = ModuleFilesSettings.getInstance(project)
+        if (fileSettings.showExternalLibraries) {
+            result.add(ExternalLibrariesNode(project, settings))
+        }
+        
         return result
     }
 

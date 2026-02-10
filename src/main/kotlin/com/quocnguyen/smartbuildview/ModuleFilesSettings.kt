@@ -15,15 +15,26 @@ import com.intellij.openapi.project.Project
 class ModuleFilesSettings : PersistentStateComponent<ModuleFilesSettings.State> {
 
     data class State(
-        var showBuildGradle: Boolean = true,
-        var showProguardRules: Boolean = true,
-        var showConsumerRules: Boolean = true,
-        var showBuildConfig: Boolean = true,
-        var showManifests: Boolean = true,
+        // Source folders
         var showKotlinJava: Boolean = true,
         var showRes: Boolean = true,
         var showAssets: Boolean = true,
-        var showOtherFiles: Boolean = false  // Show all other files like Project view
+        var showTestSources: Boolean = false,
+        var showAndroidTestSources: Boolean = false,
+        
+        // Configuration files
+        var showManifests: Boolean = true,
+        var showBuildGradle: Boolean = true,
+        var showProguardRules: Boolean = true,
+        var showConsumerRules: Boolean = true,
+        
+        // Generated content
+        var showBuildConfig: Boolean = true,
+        var showGeneratedFolders: Boolean = false,
+        
+        // Other
+        var showOtherFiles: Boolean = false,  // Show all other files like Project view
+        var showExternalLibraries: Boolean = false
     )
 
     private var myState = State()
@@ -33,6 +44,32 @@ class ModuleFilesSettings : PersistentStateComponent<ModuleFilesSettings.State> 
     override fun loadState(state: State) {
         myState = state
     }
+
+    // Source folders
+    var showKotlinJava: Boolean
+        get() = myState.showKotlinJava
+        set(value) { myState.showKotlinJava = value }
+
+    var showRes: Boolean
+        get() = myState.showRes
+        set(value) { myState.showRes = value }
+
+    var showAssets: Boolean
+        get() = myState.showAssets
+        set(value) { myState.showAssets = value }
+
+    var showTestSources: Boolean
+        get() = myState.showTestSources
+        set(value) { myState.showTestSources = value }
+
+    var showAndroidTestSources: Boolean
+        get() = myState.showAndroidTestSources
+        set(value) { myState.showAndroidTestSources = value }
+
+    // Configuration files
+    var showManifests: Boolean
+        get() = myState.showManifests
+        set(value) { myState.showManifests = value }
 
     var showBuildGradle: Boolean
         get() = myState.showBuildGradle
@@ -46,29 +83,23 @@ class ModuleFilesSettings : PersistentStateComponent<ModuleFilesSettings.State> 
         get() = myState.showConsumerRules
         set(value) { myState.showConsumerRules = value }
 
+    // Generated content
     var showBuildConfig: Boolean
         get() = myState.showBuildConfig
         set(value) { myState.showBuildConfig = value }
 
-    var showManifests: Boolean
-        get() = myState.showManifests
-        set(value) { myState.showManifests = value }
+    var showGeneratedFolders: Boolean
+        get() = myState.showGeneratedFolders
+        set(value) { myState.showGeneratedFolders = value }
 
-    var showKotlinJava: Boolean
-        get() = myState.showKotlinJava
-        set(value) { myState.showKotlinJava = value }
-
-    var showRes: Boolean
-        get() = myState.showRes
-        set(value) { myState.showRes = value }
-
-    var showAssets: Boolean
-        get() = myState.showAssets
-        set(value) { myState.showAssets = value }
-
+    // Other
     var showOtherFiles: Boolean
         get() = myState.showOtherFiles
         set(value) { myState.showOtherFiles = value }
+
+    var showExternalLibraries: Boolean
+        get() = myState.showExternalLibraries
+        set(value) { myState.showExternalLibraries = value }
 
     companion object {
         fun getInstance(project: Project): ModuleFilesSettings {

@@ -45,6 +45,25 @@
         <treeStructureProvider implementation="com.quocnguyen.smartbuildview.AndroidBuildTreeStructureProvider"
                                order="first"/>
 
+        <!-- Settings panel (still available in Settings for discoverability) -->
+        <projectConfigurable 
+            parentId="tools"
+            instance="com.quocnguyen.smartbuildview.AndroidBuildViewConfigurable"
+            id="com.quocnguyen.smartbuildview.AndroidBuildViewConfigurable"
+            displayName="Android + Build View"
+            nonDefaultProject="true"/>
+
         <!-- Settings service is auto-discovered via @Service annotation -->
     </extensions>
+
+    <actions>
+        <!-- Settings action in Project View toolbar -->
+        <action id="AndroidBuildView.Settings"
+                class="com.quocnguyen.smartbuildview.AndroidBuildViewSettingsAction"
+                text="Android + Build View Settings"
+                description="Configure what to show in Android + Build view"
+                icon="AllIcons.General.Settings">
+            <add-to-group group-id="ProjectViewToolbar" anchor="last"/>
+        </action>
+    </actions>
 </idea-plugin>
