@@ -21,17 +21,27 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       
+      # Cache IntelliJ SDK downloads (large files, ~500MB+)
+      - name: Cache IntelliJ SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/JetBrains
+            ~/Library/Caches/JetBrains
+            build/idea-sandbox
+          key: ${{ runner.os }}-intellij-sdk-${{ hashFiles('build.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-intellij-sdk-
+      
+      # Setup Gradle with automatic dependency caching
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-home-cache-cleanup: true
       
       - name: Make gradlew executable
         run: chmod +x ./gradlew
       
       - name: Build and verify plugin
-        run: |
-          ./gradlew buildPlugin verifyPlugin --no-daemon
+        run: ./gradlew buildPlugin verifyPlugin --no-daemon --parallel
       
       - name: Get version from tag
         id: get_version

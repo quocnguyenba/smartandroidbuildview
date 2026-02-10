@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     id("java")
@@ -11,6 +12,13 @@ version = "1.0.0"
 
 repositories {
     mavenCentral()
+}
+
+dependencies {
+    // JUnit 5 for testing
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.1")
+    testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
 }
 
 intellij {
@@ -30,8 +38,12 @@ tasks {
         targetCompatibility = "17"
     }
     
-    withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    withType<KotlinCompile> {
         compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
+    }
+
+    test {
+        useJUnitPlatform()
     }
 
     patchPluginXml {
