@@ -1,4 +1,4 @@
-<idea-plugin>
+<idea-plugin require-restart="false">
     <id>com.quocnguyen.smartbuildview</id>
     <name>Android + Build Files View</name>
     <version>1.0.0</version>
@@ -23,6 +23,7 @@
         <li>Same structure as Android view (manifests, kotlin+java, res, etc.)</li>
         <li>Build configuration files visible under each module</li>
         <li>No more scrolling to Gradle Scripts!</li>
+        <li><b>No restart required</b> - Install and update without restarting your IDE</li>
     </ul>
     ]]></description>
 
@@ -44,7 +45,6 @@
         <treeStructureProvider implementation="com.quocnguyen.smartbuildview.AndroidBuildTreeStructureProvider"
                                order="first"/>
 
-        <!-- Settings service for file visibility -->
-        <projectService serviceImplementation="com.quocnguyen.smartbuildview.ModuleFilesSettings"/>
+        <!-- Settings service is auto-discovered via @Service annotation -->
     </extensions>
 </idea-plugin>

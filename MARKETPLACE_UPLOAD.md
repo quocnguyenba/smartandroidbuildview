@@ -8,6 +8,7 @@ This guide walks you through uploading your plugin to JetBrains Marketplace.
 ✅ **Build configuration**: Ready  
 ✅ **Tests**: 24 tests passing  
 ✅ **Plugin verified**: Compatible with IntelliJ 2024.1+  
+✅ **Dynamic plugin**: No restart required for installation/updates  
 
 ## Step 1: Build the Plugin
 

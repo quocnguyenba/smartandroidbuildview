@@ -13,6 +13,7 @@ An IntelliJ IDEA / Android Studio plugin that adds a new **"Android + Build"** p
 - **No More Scrolling**: Access module build files without navigating to the separate "Gradle Scripts" section
 - **Smart Module Detection**: Automatically detects Android app and library modules with appropriate icons
 - **Customizable Visibility**: Settings to show/hide different file types (manifests, build config, etc.)
+- **No Restart Required**: Install and update without restarting your IDE (dynamic plugin support)
 
 ## Installation
 
