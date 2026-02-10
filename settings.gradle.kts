@@ -1,1 +1,1 @@
-rootProject.name = "module-files-quick-access"
+rootProject.name = "smart-android-build-files-view"
