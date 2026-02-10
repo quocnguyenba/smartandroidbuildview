@@ -1,13 +1,16 @@
-# Module Files Quick Access Plugin
+# Android + Build Files View Plugin
 
-An IntelliJ IDEA / Android Studio plugin that provides quick access to module configuration files (`build.gradle`, `proguard-rules.pro`, `consumer-rules.pro`) directly from each module in the Project view.
+An IntelliJ IDEA / Android Studio plugin that adds a new **"Android + Build"** project view, combining the familiar Android view structure with immediate access to build configuration files under each module.
 
 ## Features
 
-- **Context Menu Integration**: Right-click on any module folder to access its configuration files
-- **Keyboard Shortcut**: Press `Ctrl+Alt+M` to show a popup with module files
-- **Tool Window**: A dedicated tool window showing all modules and their configuration files
-- **Smart Detection**: Supports both Groovy (`.gradle`) and Kotlin DSL (`.gradle.kts`) build files
+- **Custom Project View**: A new "Android + Build" option in the project view dropdown
+- **Android-Style Structure**: Shows modules hierarchically with familiar Android folders (kotlin+java, res, assets, manifests)
+- **Build Files Visible**: Display `build.gradle.kts`, `proguard-rules.pro`, and `consumer-rules.pro` directly under each module
+- **No More Scrolling**: Access module build files without navigating to the separate "Gradle Scripts" section
+- **Smart Module Detection**: Automatically detects Android app and library modules with appropriate icons
+- **Customizable Visibility**: Settings to show/hide different file types (manifests, build config, etc.)
+- **Tool Window**: Browse all modules and their configuration files in a dedicated tool window
 
 ## Installation
 
@@ -16,7 +19,7 @@ An IntelliJ IDEA / Android Studio plugin that provides quick access to module co
 1. Clone this repository
 2. Open the project in IntelliJ IDEA
 3. Run `./gradlew buildPlugin`
-4. Install the plugin from `build/distributions/module-files-quick-access-*.zip`
+4. Install the plugin from `build/distributions/Android + Build Files View-1.0.0.zip`
 
 ### From JetBrains Marketplace
 
@@ -24,29 +27,36 @@ Coming soon...
 
 ## Usage
 
-### Context Menu
+### Switching to Android + Build View
 
-1. Right-click on a module folder in the Project view
-2. Select "Module Files" from the context menu
-3. Choose the file you want to open:
-   - Open build.gradle
-   - Open proguard-rules.pro
-   - Open consumer-rules.pro
-   - Open All Module Files
+1. Open the Project tool window (usually on the left side)
+2. Click the dropdown at the top (where it shows "Android", "Project", etc.)
+3. Select **"Android + Build"**
+4. Your project structure will now show build files under each module
 
-### Keyboard Shortcut
+### What You'll See
 
-1. Select a file or folder within a module
-2. Press `Ctrl+Alt+M` (or `Cmd+Alt+M` on macOS)
-3. Select the file from the popup
+Each module displays:
+- **kotlin+java** - Source folders containing Kotlin and Java code
+- **res** - Android resource directories
+- **assets** - Android asset directories (if present)
+- **AndroidManifest.xml** - Module manifest file
+- **build.gradle.kts** (or `build.gradle`) - Build configuration
+- **proguard-rules.pro** - ProGuard rules (if present)
+- **consumer-rules.pro** - Consumer rules for libraries (if present)
+- **BuildConfig.java** - Generated build configuration (if enabled)
+
+At the bottom of the view, you'll find a **Gradle Scripts** section with root project files like `settings.gradle.kts` and project-level `build.gradle.kts`.
 
 ### Tool Window
 
-1. Open the "Module Files" tool window from the right sidebar
-2. Browse all modules and their configuration files
-3. Double-click to open any file
+1. Look for the "Module Files" tool window (typically on the right sidebar)
+2. Browse all modules and their configuration files in a tree structure
+3. Double-click any file to open it
 
-## Building
+## Development
+
+### Building
 
 ```bash
 # Build the plugin
@@ -59,10 +69,29 @@ Coming soon...
 ./gradlew verifyPlugin
 ```
 
+### Project Structure
+
+- `AndroidBuildViewPane.kt` - Custom project view pane implementation
+- `AndroidBuildTreeStructureProvider.kt` - Tree structure provider for organizing modules hierarchically
+- `AndroidBuildTreeNodes.kt` - Custom tree nodes for modules, files, and folders with smart sorting
+- `ModuleBuildFilesToolWindow.kt` - Tool window for browsing module configuration files
+- `ModuleFilesSettings.kt` - Persistent settings for file visibility customization
+
 ## Requirements
 
-- IntelliJ IDEA 2023.3 or later
-- Android Studio Iguana or later (for Android development)
+- IntelliJ IDEA 2024.1 or later (build 241+)
+- Android Studio Jellyfish or later (for Android development)
+- Java 17 or later
+
+## Why This Plugin?
+
+In standard Android Studio, build configuration files are separated from modules in the "Gradle Scripts" section, requiring constant scrolling and context switching. The Android view hides these files for a cleaner look, but makes them harder to access.
+
+This plugin solves that by:
+- Keeping the clean Android view structure you love
+- Making build files immediately accessible under each module
+- Eliminating the need to scroll to "Gradle Scripts"
+- Maintaining proper hierarchical organization for multi-module projects
 
 ## License
 
