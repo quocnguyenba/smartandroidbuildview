@@ -10,7 +10,6 @@ An IntelliJ IDEA / Android Studio plugin that adds a new **"Android + Build"** p
 - **No More Scrolling**: Access module build files without navigating to the separate "Gradle Scripts" section
 - **Smart Module Detection**: Automatically detects Android app and library modules with appropriate icons
 - **Customizable Visibility**: Settings to show/hide different file types (manifests, build config, etc.)
-- **Tool Window**: Browse all modules and their configuration files in a dedicated tool window
 
 ## Installation
 
@@ -48,12 +47,6 @@ Each module displays:
 
 At the bottom of the view, you'll find a **Gradle Scripts** section with root project files like `settings.gradle.kts` and project-level `build.gradle.kts`.
 
-### Tool Window
-
-1. Look for the "Module Files" tool window (typically on the right sidebar)
-2. Browse all modules and their configuration files in a tree structure
-3. Double-click any file to open it
-
 ## Development
 
 ### Building
@@ -74,7 +67,6 @@ At the bottom of the view, you'll find a **Gradle Scripts** section with root pr
 - `AndroidBuildViewPane.kt` - Custom project view pane implementation
 - `AndroidBuildTreeStructureProvider.kt` - Tree structure provider for organizing modules hierarchically
 - `AndroidBuildTreeNodes.kt` - Custom tree nodes for modules, files, and folders with smart sorting
-- `ModuleBuildFilesToolWindow.kt` - Tool window for browsing module configuration files
 - `ModuleFilesSettings.kt` - Persistent settings for file visibility customization
 
 ## Requirements
