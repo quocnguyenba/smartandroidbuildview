@@ -1,0 +1,46 @@
+<idea-plugin>
+    <id>com.quocnguyen.smartbuildview</id>
+    <name>Android + Build Files View</name>
+    <vendor email="quoc@example.com" url="https://github.com/quocnguyen">Quoc Nguyen</vendor>
+
+    <description><![CDATA[
+    Adds a new "Android + Build" view that shows the same structure as Android view, 
+    but with build.gradle, proguard-rules.pro, and consumer-rules.pro visible under each module.
+    
+    <h3>Usage:</h3>
+    <ol>
+        <li>Open the Project tool window</li>
+        <li>Click the dropdown at the top (where it shows "Android" or "Project")</li>
+        <li>Select <b>"Android + Build"</b></li>
+    </ol>
+    
+    <h3>Features:</h3>
+    <ul>
+        <li>Same structure as Android view (manifests, kotlin+java, res, etc.)</li>
+        <li>Build configuration files visible under each module</li>
+        <li>No more scrolling to Gradle Scripts!</li>
+    </ul>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    <!-- Android plugin is optional - icons will fall back if not available -->
+    <depends optional="true" config-file="android-plugin.xml">org.jetbrains.android</depends>
+
+    <!-- Kotlin K2 mode compatibility -->
+    <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <supportsKotlinPluginMode supportsK2="true" supportsK1="true"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Custom "Android + Build" Project View Pane -->
+        <projectViewPane implementation="com.quocnguyen.smartbuildview.AndroidBuildViewPane"/>
+        
+        <!-- Tree Structure Provider for the custom view -->
+        <treeStructureProvider implementation="com.quocnguyen.smartbuildview.AndroidBuildTreeStructureProvider"
+                               order="first"/>
+
+        <!-- Settings service for file visibility -->
+        <projectService serviceImplementation="com.quocnguyen.smartbuildview.ModuleFilesSettings"/>
+    </extensions>
+</idea-plugin>
