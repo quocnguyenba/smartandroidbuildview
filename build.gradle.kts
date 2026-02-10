@@ -48,6 +48,7 @@ tasks {
     }
 
     patchPluginXml {
+        version.set(project.version.toString())
         sinceBuild.set("241")
         untilBuild.set("") // No upper limit - compatible with all future versions
     }
