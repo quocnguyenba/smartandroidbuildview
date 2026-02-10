@@ -25,7 +25,7 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
 
     override fun getIcon(): Icon = AllIcons.Nodes.Module
 
-    override fun getWeight(): Int = 142 // Just after Android view (which is ~141)
+    override fun getWeight(): Int = 105 // Just after Android view (which is 100)
 
     // Hide Scratches and Consoles from this view
     override fun supportsShowScratchesAndConsoles(): Boolean = false

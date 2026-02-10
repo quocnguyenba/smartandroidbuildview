@@ -404,6 +404,7 @@ class SortedDirNode(
 
     override fun contains(file: VirtualFile): Boolean = file.path.startsWith(dir.virtualFile.path)
     override fun getSortKey(): Comparable<*> = sortKey
+    override fun getTypeSortWeight(sortByType: Boolean): Int = 10  // Directories have lower weight
 }
 
 // === ORIGINAL NODES (for compatibility) ===
@@ -419,8 +420,8 @@ class AndroidBuildModuleWithChildrenNode(
     override fun update(presentation: PresentationData) {
         presentation.clearText()
         presentation.addText(displayName, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-        // Parent module with children - use ModuleGroup icon
-        presentation.setIcon(AllIcons.Nodes.ModuleGroup)
+        // Parent module with children - use Android-specific icon (same as Android view)
+        presentation.setIcon(AndroidBuildModuleNode.getModuleIcon(getModuleDir()))
     }
 
     override fun getChildren(): Collection<AbstractTreeNode<*>> {
@@ -432,7 +433,7 @@ class AndroidBuildModuleWithChildrenNode(
         val children = mutableListOf<AbstractTreeNode<*>>()
 
         // Child modules first
-        val childModules = childHierarchyNodes.sortedBy { it.displayName }.map { it.toTreeNode() }
+        children.addAll(childHierarchyNodes.sortedBy { it.displayName }.map { it.toTreeNode() })
 
         if (moduleDir != null) {
             // Source folders
@@ -524,8 +525,8 @@ class ModuleGroupNode(
     override fun update(presentation: PresentationData) {
         presentation.clearText()
         presentation.addText(displayName, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-        // Pure grouping node (no module content) - use ModuleGroup icon
-        presentation.setIcon(AllIcons.Nodes.ModuleGroup)
+        // Pure grouping node (no module content) - use Module icon
+        presentation.setIcon(AllIcons.Nodes.Module)
     }
 
     override fun getChildren(): Collection<AbstractTreeNode<*>> {
@@ -698,6 +699,7 @@ class SortedCompactPackageNode(
         file.path.startsWith(rootDir.virtualFile.path)
     
     override fun getSortKey(): Comparable<*> = sortKey
+    override fun getTypeSortWeight(sortByType: Boolean): Int = 10  // Directories have lower weight
 }
 
 /**
@@ -736,6 +738,7 @@ class SortedPsiDirNode(
 
     override fun contains(file: VirtualFile): Boolean = file.path.startsWith(dir.virtualFile.path)
     override fun getSortKey(): Comparable<*> = sortKey
+    override fun getTypeSortWeight(sortByType: Boolean): Int = 10  // Directories have lower weight
 }
 
 /**
@@ -748,4 +751,5 @@ class SortedPsiFileNode(
     val sortKey: String
 ) : PsiFileNode(project, psiFile, settings) {
     override fun getSortKey(): Comparable<*> = sortKey
+    override fun getTypeSortWeight(sortByType: Boolean): Int = 20  // Files have higher weight than directories
 }
