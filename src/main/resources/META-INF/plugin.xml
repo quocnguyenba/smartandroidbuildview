@@ -1,7 +1,7 @@
 <idea-plugin require-restart="false">
     <id>com.quocnguyen.smartbuildview</id>
     <name>Android + Build Files View</name>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
     <vendor email="ng.baquoc96@gmail.com" url="https://github.com/quocnguyenba">Quoc Nguyen</vendor>
     
     <!-- Specify IDE version compatibility (required) -->
