@@ -7,7 +7,9 @@ import com.intellij.ide.projectView.ViewSettings
 import com.intellij.ide.projectView.impl.nodes.PsiFileNode
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -127,7 +129,12 @@ class AndroidBuildModuleNode(
         
         val children = mutableListOf<AbstractTreeNode<*>>()
 
+        // Check if this is a Gradle module (has build.gradle)
+        val isGradleModule = moduleDir.findChild("build.gradle") != null ||
+                            moduleDir.findChild("build.gradle.kts") != null
+
         // === SOURCE FOLDERS (sortKey: 00-09) ===
+        // Only show Android-style source folders for Gradle modules
 
         if (fileSettings.showKotlinJava) {
             val javaSources = findSourceDirs(moduleDir, listOf("src/main/java", "src/main/kotlin"))
@@ -150,23 +157,84 @@ class AndroidBuildModuleNode(
             }
         }
 
-        // === OTHER DIRECTORIES AND FILES (sortKey: 50-59) ===
-        // Folders first (50_xxx), then files (55_xxx) - matching Android view behavior
-        if (fileSettings.showOtherFiles) {
-            val otherDirs = moduleDir.children
-                .filter { it.isDirectory }
-                .filter { it.name !in setOf("src", "build", ".gradle", ".idea") }
-                .sortedBy { it.name }
+        // Test sources
+        if (fileSettings.showTestSources) {
+            val testSources = findSourceDirs(moduleDir, listOf("src/test/java", "src/test/kotlin"))
+            if (testSources.isNotEmpty()) {
+                children.add(SortedSourceFolderGroupNode(project, "test", AllIcons.Modules.TestRoot, testSources, settings, "03"))
+            }
+        }
 
-            otherDirs.forEachIndexed { index, dir ->
-                psiManager.findDirectory(dir)?.let { psiDir ->
-                    children.add(SortedDirNode(project, psiDir, settings, "50_${String.format("%03d", index)}"))
+        if (fileSettings.showAndroidTestSources) {
+            val androidTestSources = findSourceDirs(moduleDir, listOf("src/androidTest/java", "src/androidTest/kotlin"))
+            if (androidTestSources.isNotEmpty()) {
+                children.add(SortedSourceFolderGroupNode(project, "androidTest", AllIcons.Modules.TestRoot, androidTestSources, settings, "04"))
+            }
+        }
+
+        // Show all directories when showAllFolders is enabled
+        val shouldShowAllFolders = !isGradleModule || fileSettings.showAllFolders
+
+        // Generated folders - build folder only (only for Gradle modules)
+        if (isGradleModule && fileSettings.showGeneratedFolders) {
+            moduleDir.findChild("build")?.let { dir ->
+                if (dir.isDirectory) {
+                    psiManager.findDirectory(dir)?.let { psiDir ->
+                        children.add(SortedDirNode(project, psiDir, settings, "05"))
+                    }
                 }
             }
+        }
 
+        // === ALL DIRECTORIES (sortKey: 10-39 for non-Gradle, 40-49 for additional) ===
+        if (shouldShowAllFolders) {
+            val excludedDirs = mutableSetOf("src", "build")
+            // For non-Gradle modules showing all content, don't exclude as much
+            if (!isGradleModule) {
+                excludedDirs.clear()
+                excludedDirs.add("build")  // Still exclude build directory
+            }
+            
+            val allDirs = moduleDir.children
+                .filter { it.isDirectory }
+                .filter { it.name !in excludedDirs }
+                .sortedBy { it.name }
+
+            // Use different sort key ranges based on context
+            val sortKeyPrefix = if (!isGradleModule) "10" else "40"
+            allDirs.forEachIndexed { index, dir ->
+                // Skip if already added as a source folder (for Gradle modules)
+                if (isGradleModule && dir.name == "src") return@forEachIndexed
+                
+                psiManager.findDirectory(dir)?.let { psiDir ->
+                    children.add(SortedDirNode(project, psiDir, settings, "${sortKeyPrefix}_${String.format("%03d", index)}"))
+                }
+            }
+        }
+
+        // === CONFIG AND OTHER FILES ===
+        
+        // .gitignore files
+        if (fileSettings.showGitignore) {
+            moduleDir.findChild(".gitignore")?.let { file ->
+                if (!file.isDirectory) {
+                    psiManager.findFile(file)?.let { psiFile ->
+                        children.add(SortedFileNode(project, psiFile, settings, null, "88"))
+                    }
+                }
+            }
+        }
+
+        // Other files (non-config files)
+        if (fileSettings.showOtherFiles) {
+            val configFilesToExclude = KNOWN_CONFIG_FILES.toMutableSet()
+            if (!fileSettings.showGitignore) {
+                configFilesToExclude.add(".gitignore")
+            }
+            
             val otherFiles = moduleDir.children
                 .filter { !it.isDirectory }
-                .filter { it.name !in KNOWN_CONFIG_FILES }
+                .filter { it.name !in configFilesToExclude }
                 .filter { !it.name.startsWith("BuildConfig") }
                 .sortedBy { it.name }
             
@@ -178,47 +246,50 @@ class AndroidBuildModuleNode(
         }
 
         // === CONFIG FILES (sortKey: 90-99, BuildConfig always 99) ===
+        // Only show these for Gradle modules
         
-        // AndroidManifest.xml - direct file at same level as build.gradle
-        if (fileSettings.showManifests) {
-            findManifestFile(moduleDir)?.let { manifestFile ->
-                psiManager.findFile(manifestFile)?.let { psiFile ->
-                    children.add(SortedFileNode(project, psiFile, settings, null, "90"))
+        if (isGradleModule) {
+            // AndroidManifest.xml - direct file at same level as build.gradle
+            if (fileSettings.showManifests) {
+                findManifestFile(moduleDir)?.let { manifestFile ->
+                    psiManager.findFile(manifestFile)?.let { psiFile ->
+                        children.add(SortedFileNode(project, psiFile, settings, null, "90"))
+                    }
                 }
             }
-        }
 
-        if (fileSettings.showBuildGradle) {
-            val buildGradleFile = moduleDir.findChild("build.gradle.kts") 
-                ?: moduleDir.findChild("build.gradle")
-            buildGradleFile?.let { file ->
-                psiManager.findFile(file)?.let { psiFile ->
-                    children.add(SortedFileNode(project, psiFile, settings, null, "91"))
+            if (fileSettings.showBuildGradle) {
+                val buildGradleFile = moduleDir.findChild("build.gradle.kts") 
+                    ?: moduleDir.findChild("build.gradle")
+                buildGradleFile?.let { file ->
+                    psiManager.findFile(file)?.let { psiFile ->
+                        children.add(SortedFileNode(project, psiFile, settings, null, "91"))
+                    }
                 }
             }
-        }
 
-        if (fileSettings.showProguardRules) {
-            moduleDir.findChild("proguard-rules.pro")?.let { file ->
-                psiManager.findFile(file)?.let { psiFile ->
-                    children.add(SortedFileNode(project, psiFile, settings, null, "92"))
+            if (fileSettings.showProguardRules) {
+                moduleDir.findChild("proguard-rules.pro")?.let { file ->
+                    psiManager.findFile(file)?.let { psiFile ->
+                        children.add(SortedFileNode(project, psiFile, settings, null, "92"))
+                    }
                 }
             }
-        }
 
-        if (fileSettings.showConsumerRules) {
-            moduleDir.findChild("consumer-rules.pro")?.let { file ->
-                psiManager.findFile(file)?.let { psiFile ->
-                    children.add(SortedFileNode(project, psiFile, settings, null, "93"))
+            if (fileSettings.showConsumerRules) {
+                moduleDir.findChild("consumer-rules.pro")?.let { file ->
+                    psiManager.findFile(file)?.let { psiFile ->
+                        children.add(SortedFileNode(project, psiFile, settings, null, "93"))
+                    }
                 }
             }
-        }
 
-        // BuildConfig.java - ALWAYS LAST with sortKey 99
-        if (fileSettings.showBuildConfig) {
-            findBuildConfig(moduleDir)?.let { buildConfigFile ->
-                psiManager.findFile(buildConfigFile)?.let { psiFile ->
-                    children.add(SortedFileNode(project, psiFile, settings, "generated", "99"))
+            // BuildConfig.java - ALWAYS LAST with sortKey 99
+            if (fileSettings.showBuildConfig) {
+                findBuildConfig(moduleDir)?.let { buildConfigFile ->
+                    psiManager.findFile(buildConfigFile)?.let { psiFile ->
+                        children.add(SortedFileNode(project, psiFile, settings, "generated", "99"))
+                    }
                 }
             }
         }
@@ -450,6 +521,44 @@ class AndroidBuildModuleWithChildrenNode(
                 moduleDir.findFileByRelativePath("src/main/res")?.let { resDir ->
                     if (resDir.isDirectory) {
                         children.add(SortedSourceFolderGroupNode(project, "res", AllIcons.Modules.ResourcesRoot, listOf(resDir), settings, "11"))
+                    }
+                }
+            }
+
+            if (fileSettings.showAssets) {
+                moduleDir.findFileByRelativePath("src/main/assets")?.let { assetsDir ->
+                    if (assetsDir.isDirectory) {
+                        children.add(SortedSourceFolderGroupNode(project, "assets", AllIcons.Modules.ResourcesRoot, listOf(assetsDir), settings, "12"))
+                    }
+                }
+            }
+
+            // Test sources
+            if (fileSettings.showTestSources) {
+                val testSources = listOf("src/test/java", "src/test/kotlin").mapNotNull { 
+                    moduleDir.findFileByRelativePath(it) 
+                }.filter { it.isDirectory }
+                if (testSources.isNotEmpty()) {
+                    children.add(SortedSourceFolderGroupNode(project, "test", AllIcons.Modules.TestRoot, testSources, settings, "13"))
+                }
+            }
+
+            if (fileSettings.showAndroidTestSources) {
+                val androidTestSources = listOf("src/androidTest/java", "src/androidTest/kotlin").mapNotNull { 
+                    moduleDir.findFileByRelativePath(it) 
+                }.filter { it.isDirectory }
+                if (androidTestSources.isNotEmpty()) {
+                    children.add(SortedSourceFolderGroupNode(project, "androidTest", AllIcons.Modules.TestRoot, androidTestSources, settings, "14"))
+                }
+            }
+
+            // Generated folders - build folder only
+            if (fileSettings.showGeneratedFolders) {
+                moduleDir.findChild("build")?.let { dir ->
+                    if (dir.isDirectory) {
+                        psiManager.findDirectory(dir)?.let { psiDir ->
+                            children.add(SortedDirNode(project, psiDir, settings, "15"))
+                        }
                     }
                 }
             }
@@ -752,4 +861,69 @@ class SortedPsiFileNode(
 ) : PsiFileNode(project, psiFile, settings) {
     override fun getSortKey(): Comparable<*> = sortKey
     override fun getTypeSortWeight(sortByType: Boolean): Int = 20  // Files have higher weight than directories
+}
+
+/**
+ * External Libraries node that shows project dependencies.
+ * This delegates to the standard external libraries view from the project structure.
+ */
+class ExternalLibrariesNode(
+    project: Project,
+    private val settings: ViewSettings?
+) : ProjectViewNode<String>(project, "External Libraries", settings) {
+
+    override fun update(presentation: PresentationData) {
+        presentation.presentableText = "External Libraries"
+        presentation.setIcon(AllIcons.Nodes.PpLibFolder)
+    }
+
+    override fun getChildren(): Collection<AbstractTreeNode<*>> {
+        val project = myProject ?: return emptyList()
+        val allModules = ModuleManager.getInstance(project).modules
+        val children = mutableListOf<AbstractTreeNode<*>>()
+
+        // Group all unique library dependencies
+        val uniqueLibraries = mutableSetOf<String>()
+        
+        for (module in allModules) {
+            val rootManager = ModuleRootManager.getInstance(module)
+            for (orderEntry in rootManager.orderEntries) {
+                if (orderEntry is LibraryOrderEntry) {
+                    val libraryName = orderEntry.libraryName
+                    if (libraryName != null) {
+                        uniqueLibraries.add(libraryName)
+                    }
+                }
+            }
+        }
+
+        // Create simple text nodes for each library
+        uniqueLibraries.sorted().forEach { libName ->
+            children.add(LibraryTextNode(project, libName, settings))
+        }
+
+        return children
+    }
+
+    override fun contains(file: VirtualFile): Boolean = false
+    override fun getSortKey(): Comparable<*> = "ZZZZZ"  // After Gradle Scripts
+    override fun getWeight(): Int = 3000  // Heavy weight to ensure it's last
+}
+
+/**
+ * Simple text node for displaying library names.
+ */
+class LibraryTextNode(
+    project: Project,
+    private val libraryName: String,
+    private val settings: ViewSettings?
+) : ProjectViewNode<String>(project, libraryName, settings) {
+
+    override fun update(presentation: PresentationData) {
+        presentation.presentableText = libraryName
+        presentation.setIcon(AllIcons.Nodes.PpLib)
+    }
+
+    override fun getChildren(): Collection<AbstractTreeNode<*>> = emptyList()
+    override fun contains(file: VirtualFile): Boolean = false
 }

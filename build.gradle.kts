@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "com.quocnguyen.smartbuildview"
-version = "1.0.1"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -48,6 +48,7 @@ tasks {
     }
 
     patchPluginXml {
+        version.set(project.version.toString())
         sinceBuild.set("241")
         untilBuild.set("") // No upper limit - compatible with all future versions
     }

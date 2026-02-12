@@ -1,11 +1,7 @@
 <idea-plugin require-restart="false">
     <id>com.quocnguyen.smartbuildview</id>
     <name>Android + Build Files View</name>
-    <version>1.0.1</version>
     <vendor email="ng.baquoc96@gmail.com" url="https://github.com/quocnguyenba">Quoc Nguyen</vendor>
-    
-    <!-- Specify IDE version compatibility (required) -->
-    <idea-version since-build="241"/>
 
     <description><![CDATA[
     Adds a new "Android + Build" view that shows the same structure as Android view, 
@@ -24,6 +20,21 @@
         <li>Build configuration files visible under each module</li>
         <li>No more scrolling to Gradle Scripts!</li>
         <li><b>No restart required</b> - Install and update without restarting your IDE</li>
+        <li><b>Customizable Settings Panel</b> - Fine-tune which files and folders are shown</li>
+    </ul>
+
+    <h3>Settings Panel:</h3>
+    <p>Customize which files and folders appear in the "Android + Build" view. Access settings in two ways:</p>
+    <ul>
+        <li><b>Tool Window</b> - Click the "Build View Settings" panel on the right sidebar for quick toggles with instant preview</li>
+        <li><b>Settings Dialog</b> - Go to <b>Settings → Tools → Android + Build View</b> for the standard settings experience</li>
+    </ul>
+    <p>Available options:</p>
+    <ul>
+        <li><b>Source Folders</b> - Show/hide kotlin+java, res, assets, test, and androidTest sources</li>
+        <li><b>Configuration Files</b> - Show/hide AndroidManifest.xml, build.gradle, proguard-rules.pro, consumer-rules.pro, and .gitignore</li>
+        <li><b>Generated Content</b> - Show/hide BuildConfig.java and the build folder</li>
+        <li><b>Other</b> - Toggle other folders, other files, and external libraries</li>
     </ul>
     ]]></description>
 
@@ -44,6 +55,22 @@
         <!-- Tree Structure Provider for the custom view -->
         <treeStructureProvider implementation="com.quocnguyen.smartbuildview.AndroidBuildTreeStructureProvider"
                                order="first"/>
+
+        <!-- Settings panel (still available in Settings for discoverability) -->
+        <projectConfigurable 
+            parentId="tools"
+            instance="com.quocnguyen.smartbuildview.AndroidBuildViewConfigurable"
+            id="com.quocnguyen.smartbuildview.AndroidBuildViewConfigurable"
+            displayName="Android + Build View"
+            nonDefaultProject="true"/>
+
+        <!-- Settings Tool Window on the right bar -->
+        <toolWindow 
+            id="Build View Settings"
+            anchor="right"
+            secondary="true"
+            factoryClass="com.quocnguyen.smartbuildview.AndroidBuildSettingsToolWindowFactory"
+            icon="/META-INF/pluginIcon.svg"/>
 
         <!-- Settings service is auto-discovered via @Service annotation -->
     </extensions>
