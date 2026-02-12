@@ -34,7 +34,9 @@ class ModuleFilesSettings : PersistentStateComponent<ModuleFilesSettings.State> 
         
         // Other
         var showOtherFiles: Boolean = false,  // Show all other files like Project view
-        var showExternalLibraries: Boolean = false
+        var showExternalLibraries: Boolean = false,
+        var showAllFolders: Boolean = false,  // Show all other folders in the project
+        var showGitignore: Boolean = false  // Show .gitignore files
     )
 
     private var myState = State()
@@ -100,6 +102,14 @@ class ModuleFilesSettings : PersistentStateComponent<ModuleFilesSettings.State> 
     var showExternalLibraries: Boolean
         get() = myState.showExternalLibraries
         set(value) { myState.showExternalLibraries = value }
+
+    var showAllFolders: Boolean
+        get() = myState.showAllFolders
+        set(value) { myState.showAllFolders = value }
+
+    var showGitignore: Boolean
+        get() = myState.showGitignore
+        set(value) { myState.showGitignore = value }
 
     companion object {
         fun getInstance(project: Project): ModuleFilesSettings {

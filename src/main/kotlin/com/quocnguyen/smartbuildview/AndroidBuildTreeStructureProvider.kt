@@ -10,7 +10,9 @@ import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiManager
 
 /**
  * TreeStructureProvider that replaces the tree structure when using the "Android + Build" view.
@@ -48,11 +50,30 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
      * Excludes the root project module (just the project name without any submodule).
      */
     private fun buildModuleHierarchy(project: Project, settings: ViewSettings?): MutableCollection<AbstractTreeNode<*>> {
+        val fileSettings = ModuleFilesSettings.getInstance(project)
+        
+        // Collect all module names to check for parent-child relationships
+        val allModuleNames = ModuleManager.getInstance(project).modules.map { it.name }.toSet()
+
         val allModules = ModuleManager.getInstance(project).modules
             .filter { module ->
-                val moduleDir = getModuleDir(module)
-                moduleDir?.findChild("build.gradle") != null ||
-                moduleDir?.findChild("build.gradle.kts") != null
+                // Always exclude source set modules (main, test, androidTest, unitTest, sharedTest)
+                // whose parent Gradle module exists. Their content is already shown under the
+                // parent module's source folder groupings (kotlin+java, res, androidTest, etc.)
+                val moduleName = module.name
+                val lastPart = moduleName.substringAfterLast(".")
+                val parentName = if (moduleName.contains(".")) moduleName.substringBeforeLast(".") else null
+                val isSourceSet = lastPart in setOf("main", "test", "androidTest", "unitTest", "sharedTest")
+                val parentExists = parentName != null && parentName in allModuleNames
+
+                if (isSourceSet && parentExists) {
+                    false // Always hide source set modules - their content is already visible
+                } else {
+                    // Only show modules with build.gradle files (Gradle modules)
+                    val moduleDir = getModuleDir(module)
+                    moduleDir?.findChild("build.gradle") != null ||
+                    moduleDir?.findChild("build.gradle.kts") != null
+                }
             }
             .sortedBy { it.name }
 
@@ -106,16 +127,49 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
                 .map { it.toTreeNode() }
         )
         
+        // Add folders outside of modules if showAllFolders is enabled
+        if (fileSettings.showAllFolders) {
+            val nonModuleFolders = findNonModuleFolders(project, allModules, settings)
+            result.addAll(nonModuleFolders)
+        }
+        
         // Add Gradle Scripts (root project files) at the bottom
         result.add(RootProjectFilesNode(project, settings))
         
         // Add External Libraries if enabled
-        val fileSettings = ModuleFilesSettings.getInstance(project)
         if (fileSettings.showExternalLibraries) {
             result.add(ExternalLibrariesNode(project, settings))
         }
         
         return result
+    }
+
+    /**
+     * Finds folders in the project root that are not part of any module.
+     */
+    private fun findNonModuleFolders(project: Project, modules: List<Module>, viewSettings: ViewSettings?): List<AbstractTreeNode<*>> {
+        val basePath = project.basePath ?: return emptyList()
+        val baseDir = LocalFileSystem.getInstance().findFileByPath(basePath)
+            ?: return emptyList()
+        
+        val psiManager = PsiManager.getInstance(project)
+        val moduleRoots = modules.flatMap { ModuleRootManager.getInstance(it).contentRoots.toList() }
+        val moduleRootPaths = moduleRoots.map { it.path }.toSet()
+        
+        val folders = mutableListOf<AbstractTreeNode<*>>()
+        
+        baseDir.children
+            .filter { it.isDirectory }
+            .filter { it.path !in moduleRootPaths }
+            .filter { it.name !in setOf("build", ".gradle", ".idea", ".git", "src") }
+            .sortedBy { it.name }
+            .forEachIndexed { index, dir ->
+                psiManager.findDirectory(dir)?.let { psiDir ->
+                    folders.add(SortedDirNode(project, psiDir, viewSettings, "35_${String.format("%03d", index)}"))
+                }
+            }
+        
+        return folders
     }
 
     private fun findProjectPrefix(modules: List<Module>): String {

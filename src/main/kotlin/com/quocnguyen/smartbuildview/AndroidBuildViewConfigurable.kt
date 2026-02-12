@@ -23,91 +23,72 @@ class AndroidBuildViewConfigurable(private val project: Project) : Configurable 
     private var showBuildGradleCheckBox: JBCheckBox? = null
     private var showProguardRulesCheckBox: JBCheckBox? = null
     private var showConsumerRulesCheckBox: JBCheckBox? = null
+    private var showGitignoreCheckBox: JBCheckBox? = null
     
     private var showBuildConfigCheckBox: JBCheckBox? = null
     private var showGeneratedFoldersCheckBox: JBCheckBox? = null
     
+    private var showAllFoldersCheckBox: JBCheckBox? = null
     private var showOtherFilesCheckBox: JBCheckBox? = null
     private var showExternalLibrariesCheckBox: JBCheckBox? = null
-
     override fun getDisplayName(): String = "Android + Build View"
 
     override fun createComponent(): JComponent {
         return panel {
             group("Source Folders") {
                 row {
-                    showKotlinJavaCheckBox = checkBox("Show kotlin+java sources")
-                        .comment("Display main Kotlin and Java source directories")
-                        .component
+                    showKotlinJavaCheckBox = checkBox("Show kotlin+java sources").component
                 }
                 row {
-                    showResCheckBox = checkBox("Show res folder")
-                        .comment("Display Android resource directories")
-                        .component
+                    showResCheckBox = checkBox("Show res folder").component
                 }
                 row {
-                    showAssetsCheckBox = checkBox("Show assets folder")
-                        .comment("Display Android assets directories")
-                        .component
+                    showAssetsCheckBox = checkBox("Show assets folder").component
                 }
                 row {
-                    showTestSourcesCheckBox = checkBox("Show test sources")
-                        .comment("Display unit test source directories (src/test)")
-                        .component
+                    showTestSourcesCheckBox = checkBox("Show test sources").component
                 }
                 row {
-                    showAndroidTestSourcesCheckBox = checkBox("Show androidTest sources")
-                        .comment("Display instrumented test source directories (src/androidTest)")
-                        .component
+                    showAndroidTestSourcesCheckBox = checkBox("Show androidTest sources").component
                 }
             }
 
             group("Configuration Files") {
                 row {
-                    showManifestsCheckBox = checkBox("Show AndroidManifest.xml")
-                        .comment("Display Android manifest files")
-                        .component
+                    showManifestsCheckBox = checkBox("Show AndroidManifest.xml").component
                 }
                 row {
-                    showBuildGradleCheckBox = checkBox("Show build.gradle files")
-                        .comment("Display Gradle build scripts")
-                        .component
+                    showBuildGradleCheckBox = checkBox("Show build.gradle files").component
                 }
                 row {
-                    showProguardRulesCheckBox = checkBox("Show proguard-rules.pro")
-                        .comment("Display ProGuard configuration files")
-                        .component
+                    showProguardRulesCheckBox = checkBox("Show proguard-rules.pro").component
                 }
                 row {
-                    showConsumerRulesCheckBox = checkBox("Show consumer-rules.pro")
-                        .comment("Display consumer ProGuard rules (for libraries)")
-                        .component
+                    showConsumerRulesCheckBox = checkBox("Show consumer-rules.pro").component
+                }
+                row {
+                    showGitignoreCheckBox = checkBox("Show .gitignore").component
                 }
             }
 
             group("Generated Content") {
                 row {
-                    showBuildConfigCheckBox = checkBox("Show BuildConfig.java")
-                        .comment("Display generated BuildConfig files")
-                        .component
+                    showBuildConfigCheckBox = checkBox("Show BuildConfig.java").component
                 }
                 row {
-                    showGeneratedFoldersCheckBox = checkBox("Show generated folders")
-                        .comment("Display all generated source directories (build/generated)")
-                        .component
+                    showGeneratedFoldersCheckBox = checkBox("Show build folder").component
                 }
             }
 
             group("Other") {
                 row {
-                    showOtherFilesCheckBox = checkBox("Show other files and folders")
-                        .comment("Display additional files and directories not in standard categories")
-                        .component
+                    showAllFoldersCheckBox = checkBox("Show all other folders").component
                 }
                 row {
-                    showExternalLibrariesCheckBox = checkBox("Show external libraries")
-                        .comment("Display external dependencies and libraries")
-                        .component
+                    showOtherFilesCheckBox = checkBox("Show other files").component
+                }
+                row {
+                    showExternalLibrariesCheckBox = checkBox("Show external libraries").component
                 }
             }
         }
@@ -124,8 +105,10 @@ class AndroidBuildViewConfigurable(private val project: Project) : Configurable 
                 showBuildGradleCheckBox?.isSelected != settings.showBuildGradle ||
                 showProguardRulesCheckBox?.isSelected != settings.showProguardRules ||
                 showConsumerRulesCheckBox?.isSelected != settings.showConsumerRules ||
+                showGitignoreCheckBox?.isSelected != settings.showGitignore ||
                 showBuildConfigCheckBox?.isSelected != settings.showBuildConfig ||
                 showGeneratedFoldersCheckBox?.isSelected != settings.showGeneratedFolders ||
+                showAllFoldersCheckBox?.isSelected != settings.showAllFolders ||
                 showOtherFilesCheckBox?.isSelected != settings.showOtherFiles ||
                 showExternalLibrariesCheckBox?.isSelected != settings.showExternalLibraries
     }
@@ -143,10 +126,12 @@ class AndroidBuildViewConfigurable(private val project: Project) : Configurable 
         showBuildGradleCheckBox?.let { settings.showBuildGradle = it.isSelected }
         showProguardRulesCheckBox?.let { settings.showProguardRules = it.isSelected }
         showConsumerRulesCheckBox?.let { settings.showConsumerRules = it.isSelected }
+        showGitignoreCheckBox?.let { settings.showGitignore = it.isSelected }
         
         showBuildConfigCheckBox?.let { settings.showBuildConfig = it.isSelected }
         showGeneratedFoldersCheckBox?.let { settings.showGeneratedFolders = it.isSelected }
         
+        showAllFoldersCheckBox?.let { settings.showAllFolders = it.isSelected }
         showOtherFilesCheckBox?.let { settings.showOtherFiles = it.isSelected }
         showExternalLibrariesCheckBox?.let { settings.showExternalLibraries = it.isSelected }
 
@@ -167,10 +152,12 @@ class AndroidBuildViewConfigurable(private val project: Project) : Configurable 
         showBuildGradleCheckBox?.isSelected = settings.showBuildGradle
         showProguardRulesCheckBox?.isSelected = settings.showProguardRules
         showConsumerRulesCheckBox?.isSelected = settings.showConsumerRules
+        showGitignoreCheckBox?.isSelected = settings.showGitignore
         
         showBuildConfigCheckBox?.isSelected = settings.showBuildConfig
         showGeneratedFoldersCheckBox?.isSelected = settings.showGeneratedFolders
         
+        showAllFoldersCheckBox?.isSelected = settings.showAllFolders
         showOtherFilesCheckBox?.isSelected = settings.showOtherFiles
         showExternalLibrariesCheckBox?.isSelected = settings.showExternalLibraries
     }

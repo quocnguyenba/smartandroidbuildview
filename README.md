@@ -2,6 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Build](https://github.com/quocnguyenba/smartandroidbuildview/actions/workflows/build.yml/badge.svg)](https://github.com/quocnguyenba/smartandroidbuildview/actions/workflows/build.yml)
+[![JetBrains Marketplace](https://img.shields.io/badge/JetBrains%20Marketplace-30136-blue.svg)](https://plugins.jetbrains.com/plugin/30136-android--build-files-view)
 
 An IntelliJ IDEA / Android Studio plugin that adds a new **"Android + Build"** project view, combining the familiar Android view structure with immediate access to build configuration files under each module.
 
@@ -26,7 +27,14 @@ An IntelliJ IDEA / Android Studio plugin that adds a new **"Android + Build"** p
 
 ### From JetBrains Marketplace
 
-Coming soon...
+<a href="https://plugins.jetbrains.com/plugin/30136-android--build-files-view">
+  <img src="https://img.shields.io/badge/Get%20it%20on-JetBrains%20Marketplace-blue?style=for-the-badge&logo=jetbrains" alt="Get it on JetBrains Marketplace">
+</a>
+
+Or install directly from the IDE:
+1. Open **Settings** → **Plugins** → **Marketplace**
+2. Search for "Android + Build Files View"
+3. Click **Install**
 
 ## Usage
 
