@@ -51,7 +51,7 @@ class AndroidBuildModuleNode(
                 content.contains("com.android.application") || 
                 content.contains("id(\"com.android.application\")") ||
                 content.contains("id 'com.android.application'")
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 false
             }
         }
