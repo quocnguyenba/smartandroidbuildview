@@ -16,31 +16,33 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17'
       
-      # Cache IntelliJ SDK downloads (large files, ~500MB+)
-      - name: Cache IntelliJ SDK
+      # Cache IntelliJ SDK and Gradle dependencies
+      - name: Cache IntelliJ SDK and Gradle
         uses: actions/cache@v5
         with:
           path: |
             ~/.cache/JetBrains
             ~/Library/Caches/JetBrains
             build/idea-sandbox
-          key: ${{ runner.os }}-intellij-sdk-${{ hashFiles('build.gradle.kts') }}
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-intellij-${{ hashFiles('build.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: |
-            ${{ runner.os }}-intellij-sdk-
+            ${{ runner.os }}-gradle-intellij-
       
-      # Setup Gradle with automatic dependency caching
+      # Setup Gradle (caching handled by actions/cache above)
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+          cache-disabled: true
       
       - name: Make gradlew executable
         run: chmod +x ./gradlew
@@ -50,7 +52,7 @@ jobs:
         run: ./gradlew buildPlugin test verifyPlugin --no-daemon --parallel
       
       - name: Upload plugin artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: plugin-artifact
           path: build/distributions/*.zip
@@ -58,7 +60,7 @@ jobs:
       
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: build/test-results/
