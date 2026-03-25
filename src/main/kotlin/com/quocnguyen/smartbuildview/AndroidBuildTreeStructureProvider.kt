@@ -1,8 +1,8 @@
 package com.quocnguyen.smartbuildview
 
-import com.intellij.ide.projectView.ProjectView
 import com.intellij.ide.projectView.TreeStructureProvider
 import com.intellij.ide.projectView.ViewSettings
+import com.intellij.ide.projectView.impl.ModuleGroup
 import com.intellij.ide.projectView.impl.nodes.ProjectViewProjectNode
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.module.Module
@@ -27,11 +27,8 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
     ): MutableCollection<AbstractTreeNode<*>> {
         val project = parent.project ?: return children
 
-        // Check if our custom pane is currently active
-        val projectView = ProjectView.getInstance(project)
-        val currentPaneId = projectView.currentViewId
-
-        if (currentPaneId != AndroidBuildViewPane.ID) {
+        // Check if our custom pane is the one currently building its structure
+        if (settings !is AndroidBuildViewSettings) {
             return children
         }
 
@@ -201,12 +198,17 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
 
 /**
  * Helper class to build module hierarchy before converting to tree nodes.
+ *
+ * @param groupPath The full dot-separated group path from root to this node
+ *                  (e.g. `["feature"]` or `["feature", "ui"]`). Used to construct
+ *                  a [ModuleGroup] so IntelliJ can show "New > Module" for group nodes.
  */
 class ModuleHierarchyNode(
     val project: Project,
     val displayName: String,
     var module: Module?,
-    val settings: ViewSettings?
+    val settings: ViewSettings?,
+    private val groupPath: List<String> = listOf(displayName)
 ) {
     private val children = mutableMapOf<String, ModuleHierarchyNode>()
 
@@ -219,7 +221,8 @@ class ModuleHierarchyNode(
                 project = project,
                 displayName = childName,
                 module = module,
-                settings = settings
+                settings = settings,
+                groupPath = groupPath + childName
             )
         } else {
             val childNode = children.getOrPut(childName) {
@@ -227,7 +230,8 @@ class ModuleHierarchyNode(
                     project = project,
                     displayName = childName,
                     module = null,
-                    settings = settings
+                    settings = settings,
+                    groupPath = groupPath + childName
                 )
             }
             childNode.addChild(parts[1], module)
@@ -240,7 +244,36 @@ class ModuleHierarchyNode(
         } else if (module != null && children.isNotEmpty()) {
             AndroidBuildModuleWithChildrenNode(project, module!!, displayName, children.values.toList(), settings)
         } else {
-            ModuleGroupNode(project, displayName, children.values.toList(), settings)
+            ModuleGroupNode(
+                project, displayName, children.values.toList(), settings,
+                findGroupDir(), ModuleGroup(groupPath)
+            )
         }
+    }
+
+    /**
+     * Resolves the filesystem directory that represents this group node (e.g. `feature/`).
+     *
+     * Strategy: find the first descendant [Module] among [children], get its content-root
+     * directory, then return its **parent** — which is the directory owned by this group.
+     * For deeply-nested groups the recursion unwinds one level per call, so the correct
+     * ancestor directory is always returned.
+     *
+     * Returns `null` when no descendant module can be found (e.g. empty group, or all
+     * content roots are unavailable).
+     */
+    private fun findGroupDir(): VirtualFile? {
+        for (child in children.values) {
+            val childModule = child.module
+            if (childModule != null) {
+                val contentRoots = ModuleRootManager.getInstance(childModule).contentRoots
+                val childDir = contentRoots.firstOrNull()
+                return childDir?.parent
+            }
+            // Child itself is a group – recurse one level deeper, then step up one directory
+            val nestedDir = child.findGroupDir()
+            if (nestedDir != null) return nestedDir.parent
+        }
+        return null
     }
 }
