@@ -3,11 +3,18 @@ package com.quocnguyen.smartbuildview
 import com.intellij.icons.AllIcons
 import com.intellij.ide.SelectInContext
 import com.intellij.ide.SelectInTarget
+import com.intellij.ide.projectView.impl.ProjectAbstractTreeStructureBase
 import com.intellij.ide.projectView.impl.ProjectViewPane
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiManager
 import javax.swing.Icon
+
+/**
+ * Marker interface to identify when our custom tree structure is active.
+ * Used by [AndroidBuildTreeStructureProvider] to conditionally modify the tree.
+ */
+interface AndroidBuildViewSettings
 
 /**
  * Custom Project View Pane that mimics the Android view but includes build files under each module.
@@ -29,6 +36,12 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
 
     // Hide Scratches and Consoles from this view
     override fun supportsShowScratchesAndConsoles(): Boolean = false
+
+    protected inner class AndroidBuildTreeStructure : ProjectViewPaneTreeStructure(), AndroidBuildViewSettings
+
+    override fun createStructure(): ProjectAbstractTreeStructureBase {
+        return AndroidBuildTreeStructure()
+    }
 
     /**
      * Create a custom SelectInTarget to enable "Select Opened File" functionality.

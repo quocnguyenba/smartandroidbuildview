@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.projectView.PresentationData
 import com.intellij.ide.projectView.ProjectViewNode
 import com.intellij.ide.projectView.ViewSettings
+import com.intellij.ide.projectView.impl.ModuleGroup
 import com.intellij.ide.projectView.impl.nodes.PsiFileNode
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.module.Module
@@ -11,6 +12,8 @@ import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModuleRootManager
+import com.intellij.openapi.roots.OrderRootType
+import com.intellij.openapi.roots.libraries.Library
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDirectory
@@ -348,6 +351,19 @@ class AndroidBuildModuleNode(
         return null
     }
 
+    override fun getVirtualFile(): VirtualFile? = getModuleDir()
+
+    /**
+     * Exposes the module content-root directory so that the project view pane's
+     * getElementsFromNode can convert it into a PsiDirectory. Without this, the
+     * data-context has no PSI_ELEMENT and IDE actions (New Module, New Kotlin File,
+     * etc.) are hidden for this node.
+     */
+    override fun getRoots(): Collection<VirtualFile> {
+        val dir = getModuleDir() ?: return emptyList()
+        return listOf(dir)
+    }
+
     override fun contains(file: VirtualFile): Boolean {
         val moduleDir = getModuleDir() ?: return false
         return file.path.startsWith(moduleDir.path)
@@ -359,7 +375,7 @@ class AndroidBuildModuleNode(
 class SortedSourceGroupNode(
     project: Project,
     private val name: String,
-    private val icon: javax.swing.Icon,
+    private val icon: Icon,
     private val files: List<PsiFile>,
     private val settings: ViewSettings?,
     val sortKey: String
@@ -616,6 +632,19 @@ class AndroidBuildModuleWithChildrenNode(
         return contentRoots.firstOrNull()
     }
 
+    override fun getVirtualFile(): VirtualFile? = getModuleDir()
+
+    /**
+     * Exposes the module content-root directory so that the project view pane's
+     * getElementsFromNode can convert it into a PsiDirectory. Without this, the
+     * data-context has no PSI_ELEMENT and IDE actions (New Module, New Kotlin File,
+     * etc.) are hidden for this node.
+     */
+    override fun getRoots(): Collection<VirtualFile> {
+        val dir = getModuleDir() ?: return emptyList()
+        return listOf(dir)
+    }
+
     override fun contains(file: VirtualFile): Boolean {
         val moduleDir = getModuleDir() ?: return false
         return file.path.startsWith(moduleDir.path)
@@ -624,12 +653,23 @@ class AndroidBuildModuleWithChildrenNode(
 
 // Wrapper not needed - child modules are sorted directly
 
+/**
+ * Pure grouping node for multi-layer module hierarchies (e.g. a `feature` directory
+ * that contains child modules but has no `build.gradle` of its own).
+ *
+ * The value type is [ModuleGroup] so that IntelliJ's data-context extraction recognises
+ * it for `ModuleGroup.ARRAY_DATA_KEY`. This makes the **New > Module** action visible
+ * when the user right-clicks this node (see NewModuleInGroupAction).
+ */
 class ModuleGroupNode(
     project: Project,
     private val displayName: String,
     private val childHierarchyNodes: List<ModuleHierarchyNode>,
-    private val settings: ViewSettings?
-) : ProjectViewNode<String>(project, displayName, settings) {
+    settings: ViewSettings?,
+    /** The filesystem directory this group node corresponds to (e.g. `feature/`). */
+    private val groupVirtualFile: VirtualFile? = null,
+    moduleGroup: ModuleGroup
+) : ProjectViewNode<ModuleGroup>(project, moduleGroup, settings) {
 
     override fun update(presentation: PresentationData) {
         presentation.clearText()
@@ -642,9 +682,20 @@ class ModuleGroupNode(
         return childHierarchyNodes.sortedBy { it.displayName }.map { it.toTreeNode() }
     }
 
+    override fun getVirtualFile(): VirtualFile? = groupVirtualFile
+
+    /**
+     * Exposes the group directory so that the project view pane's getElementsFromNode
+     * can convert it into a PsiDirectory. This populates PSI_ELEMENT in the data-context,
+     * enabling IDE actions (New Kotlin File, etc.) for this node.
+     */
+    override fun getRoots(): Collection<VirtualFile> {
+        return if (groupVirtualFile != null) listOf(groupVirtualFile) else emptyList()
+    }
+
     override fun contains(file: VirtualFile): Boolean {
         // Check if any child hierarchy node contains this file
-        return getChildren().any { childNode ->
+        return children.any { childNode ->
             (childNode as? ProjectViewNode<*>)?.contains(file) == true
         }
     }
@@ -746,36 +797,54 @@ class GlobalGradlePropertiesNode(
 
 /**
  * Compact package node with explicit sort key for proper folder-first ordering.
+ * Collapses single-child-directory chains into a dotted display name (e.g. "com.a.b.c").
+ *
+ * IMPORTANT: The superclass [ProjectViewNode] is constructed with [computeFinalDir] so that
+ * [getValue] returns the deepest directory in the chain. This ensures "New File/Class" IDE
+ * actions target the correct package directory (e.g. com/a/b/c) instead of the root (com).
+ * [rootDir] is kept separately only for [contains] checks that must cover the whole chain.
  */
 class SortedCompactPackageNode(
     project: Project,
     private val rootDir: PsiDirectory,
     private val settings: ViewSettings?,
     val sortKey: String
-) : ProjectViewNode<PsiDirectory>(project, rootDir, settings) {
+) : ProjectViewNode<PsiDirectory>(project, computeFinalDir(rootDir), settings) {
 
-    private val compactedInfo: Pair<String, PsiDirectory> by lazy {
-        computeCompactedPath(rootDir)
-    }
+    // Eagerly compute the dotted display name (e.g. "com.a.b.c")
+    private val compactedName: String = computeCompactedName(rootDir)
 
-    private val compactedName: String get() = compactedInfo.first
-    private val finalDir: PsiDirectory get() = compactedInfo.second
-
-    private fun computeCompactedPath(dir: PsiDirectory): Pair<String, PsiDirectory> {
-        val pathParts = mutableListOf(dir.name)
-        var currentDir = dir
-
-        while (true) {
-            val subdirs = currentDir.subdirectories
-            val files = currentDir.files
-            if (files.isNotEmpty() || subdirs.size != 1) {
-                break
+    companion object {
+        /**
+         * Traverses single-child directory chains and returns the deepest directory.
+         * e.g. com → a → b → c (each with one child subdir) returns the "c" directory.
+         */
+        fun computeFinalDir(dir: PsiDirectory): PsiDirectory {
+            var current = dir
+            while (true) {
+                val subdirs = current.subdirectories
+                val files = current.files
+                if (files.isNotEmpty() || subdirs.size != 1) break
+                current = subdirs.first()
             }
-            currentDir = subdirs.first()
-            pathParts.add(currentDir.name)
+            return current
         }
 
-        return Pair(pathParts.joinToString("."), currentDir)
+        /**
+         * Returns the dotted display name for a compact chain (e.g. "com.a.b.c").
+         */
+        fun computeCompactedName(dir: PsiDirectory): String {
+            val pathParts = mutableListOf(dir.name)
+            var current = dir
+            while (true) {
+                val subdirs = current.subdirectories
+                val files = current.files
+                if (files.isNotEmpty() || subdirs.size != 1) break
+                current = subdirs.first()
+                pathParts.add(current.name)
+            }
+            return pathParts.joinToString(".")
+        }
     }
 
     override fun update(presentation: PresentationData) {
@@ -785,14 +854,16 @@ class SortedCompactPackageNode(
 
     override fun getChildren(): Collection<AbstractTreeNode<*>> {
         val project = myProject ?: return emptyList()
+        // value == finalDir (the deepest directory passed to the superclass constructor)
+        val finalDir = value
         val children = mutableListOf<AbstractTreeNode<*>>()
 
         // Folders first (sort key "0_name"), then files (sort key "1_name")
-        children.addAll(finalDir.subdirectories.sortedBy { it.name }.map { 
-            SortedCompactPackageNode(project, it, settings, "0_${it.name}") 
+        children.addAll(finalDir.subdirectories.sortedBy { it.name }.map {
+            SortedCompactPackageNode(project, it, settings, "0_${it.name}")
         })
-        children.addAll(finalDir.files.sortedBy { it.name }.map { 
-            SortedPsiFileNode(project, it, settings, "1_${it.name}") 
+        children.addAll(finalDir.files.sortedBy { it.name }.map {
+            SortedPsiFileNode(project, it, settings, "1_${it.name}")
         })
 
         return children.sortedBy { node ->
@@ -804,9 +875,10 @@ class SortedCompactPackageNode(
         }
     }
 
-    override fun contains(file: VirtualFile): Boolean = 
+    // rootDir covers the entire compact chain, so contains() works for all files within it
+    override fun contains(file: VirtualFile): Boolean =
         file.path.startsWith(rootDir.virtualFile.path)
-    
+
     override fun getSortKey(): Comparable<*> = sortKey
     override fun getTypeSortWeight(sortByType: Boolean): Int = 10  // Directories have lower weight
 }
@@ -880,29 +952,26 @@ class ExternalLibrariesNode(
     override fun getChildren(): Collection<AbstractTreeNode<*>> {
         val project = myProject ?: return emptyList()
         val allModules = ModuleManager.getInstance(project).modules
-        val children = mutableListOf<AbstractTreeNode<*>>()
 
-        // Group all unique library dependencies
-        val uniqueLibraries = mutableSetOf<String>()
-        
+        // Collect unique libraries, keyed by name, preserving the Library object
+        val uniqueLibraries = mutableMapOf<String, Library>()
+
         for (module in allModules) {
             val rootManager = ModuleRootManager.getInstance(module)
             for (orderEntry in rootManager.orderEntries) {
                 if (orderEntry is LibraryOrderEntry) {
+                    val library = orderEntry.library
                     val libraryName = orderEntry.libraryName
-                    if (libraryName != null) {
-                        uniqueLibraries.add(libraryName)
+                    if (library != null && libraryName != null) {
+                        uniqueLibraries[libraryName] = library
                     }
                 }
             }
         }
 
-        // Create simple text nodes for each library
-        uniqueLibraries.sorted().forEach { libName ->
-            children.add(LibraryTextNode(project, libName, settings))
-        }
-
-        return children
+        return uniqueLibraries.entries
+            .sortedBy { it.key }
+            .map { (name, library) -> LibraryNode(project, name, library, settings) }
     }
 
     override fun contains(file: VirtualFile): Boolean = false
@@ -911,11 +980,16 @@ class ExternalLibrariesNode(
 }
 
 /**
- * Simple text node for displaying library names.
+ * Node representing a named library (e.g. a Gradle/Maven dependency).
+ *
+ * When expanded it shows one child [LibraryClassRootNode] per JAR/class-root that belongs to
+ * the library.  If the library has exactly one root its packages are surfaced directly as
+ * children, skipping the intermediate JAR node for a cleaner tree.
  */
-class LibraryTextNode(
+class LibraryNode(
     project: Project,
     private val libraryName: String,
+    private val library: Library,
     private val settings: ViewSettings?
 ) : ProjectViewNode<String>(project, libraryName, settings) {
 
@@ -924,6 +998,83 @@ class LibraryTextNode(
         presentation.setIcon(AllIcons.Nodes.PpLib)
     }
 
-    override fun getChildren(): Collection<AbstractTreeNode<*>> = emptyList()
+    override fun getChildren(): Collection<AbstractTreeNode<*>> {
+        val project = myProject ?: return emptyList()
+        val classRoots = library.getFiles(OrderRootType.CLASSES)
+
+        return when {
+            classRoots.isEmpty() -> emptyList()
+            classRoots.size == 1 -> {
+                // Single JAR – inline the package tree directly under the library node
+                buildPackageChildren(project, classRoots[0])
+            }
+            else -> {
+                // Multiple JARs – show one LibraryClassRootNode per JAR
+                val psiManager = PsiManager.getInstance(project)
+                classRoots.mapNotNull { root ->
+                    psiManager.findDirectory(root)?.let { psiDir ->
+                        // Use the JAR file name (parent of the "!/" virtual root)
+                        val jarName = root.parent?.name ?: root.name
+                        LibraryClassRootNode(project, jarName, psiDir, settings)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Builds package/class children directly from a class root [VirtualFile].
+     * Sub-directories are shown as compact package nodes; top-level files as file nodes.
+     */
+    private fun buildPackageChildren(
+        project: Project,
+        root: VirtualFile
+    ): List<AbstractTreeNode<*>> {
+        val psiManager = PsiManager.getInstance(project)
+        val psiDir = psiManager.findDirectory(root) ?: return emptyList()
+        val children = mutableListOf<AbstractTreeNode<*>>()
+
+        psiDir.subdirectories.sortedBy { it.name }.forEachIndexed { i, subDir ->
+            children.add(SortedCompactPackageNode(project, subDir, settings, "0_${String.format("%03d", i)}_${subDir.name}"))
+        }
+        psiDir.files.sortedBy { it.name }.forEachIndexed { i, file ->
+            children.add(SortedPsiFileNode(project, file, settings, "1_${String.format("%03d", i)}_${file.name}"))
+        }
+        return children
+    }
+
     override fun contains(file: VirtualFile): Boolean = false
+}
+
+/**
+ * Represents a single JAR / class-root belonging to a library.
+ * Its children are the top-level packages and classes inside that root.
+ */
+class LibraryClassRootNode(
+    project: Project,
+    private val rootName: String,
+    private val rootDir: PsiDirectory,
+    private val settings: ViewSettings?
+) : ProjectViewNode<PsiDirectory>(project, rootDir, settings) {
+
+    override fun update(presentation: PresentationData) {
+        presentation.presentableText = rootName
+        presentation.setIcon(AllIcons.Nodes.PpJar)
+    }
+
+    override fun getChildren(): Collection<AbstractTreeNode<*>> {
+        val project = myProject ?: return emptyList()
+        val children = mutableListOf<AbstractTreeNode<*>>()
+
+        rootDir.subdirectories.sortedBy { it.name }.forEachIndexed { i, subDir ->
+            children.add(SortedCompactPackageNode(project, subDir, settings, "0_${String.format("%03d", i)}_${subDir.name}"))
+        }
+        rootDir.files.sortedBy { it.name }.forEachIndexed { i, file ->
+            children.add(SortedPsiFileNode(project, file, settings, "1_${String.format("%03d", i)}_${file.name}"))
+        }
+        return children
+    }
+
+    override fun contains(file: VirtualFile): Boolean =
+        file.path.startsWith(rootDir.virtualFile.path)
 }
