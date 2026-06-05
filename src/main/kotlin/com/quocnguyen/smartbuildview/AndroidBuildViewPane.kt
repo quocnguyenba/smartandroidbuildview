@@ -3,10 +3,20 @@ package com.quocnguyen.smartbuildview
 import com.intellij.icons.AllIcons
 import com.intellij.ide.SelectInContext
 import com.intellij.ide.SelectInTarget
+import com.intellij.ide.projectView.ProjectView
 import com.intellij.ide.projectView.impl.ProjectAbstractTreeStructureBase
 import com.intellij.ide.projectView.impl.ProjectViewPane
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileCopyEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.psi.PsiManager
 import javax.swing.Icon
 
@@ -26,6 +36,23 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
         const val ID = "AndroidBuildView"
     }
 
+    init {
+        project.messageBus.connect(this).subscribe(
+            VirtualFileManager.VFS_CHANGES,
+            object : BulkFileListener {
+                override fun after(events: MutableList<out VFileEvent>) {
+                    if (events.any { it.isRelevantResourceCreateEvent() }) {
+                        ApplicationManager.getApplication().invokeLater(
+                            { ProjectView.getInstance(project).refresh() },
+                            ModalityState.nonModal(),
+                            project.disposed
+                        )
+                    }
+                }
+            }
+        )
+    }
+
     override fun getTitle(): String = "Android + Build"
 
     override fun getId(): String = ID
@@ -36,6 +63,27 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
 
     // Hide Scratches and Consoles from this view
     override fun supportsShowScratchesAndConsoles(): Boolean = false
+
+    private fun VFileEvent.isRelevantResourceCreateEvent(): Boolean {
+        if (this !is VFileCreateEvent && this !is VFileCopyEvent) return false
+        val createdFile = file ?: return false
+        if (createdFile.isDirectory) return false
+
+        val fileIndex = ProjectFileIndex.getInstance(myProject)
+        return fileIndex.isInContent(createdFile) && isUnderAndroidResourceOrAssetRoot(createdFile)
+    }
+
+    private fun isUnderAndroidResourceOrAssetRoot(file: VirtualFile): Boolean {
+        var current = file.parent
+        while (current != null) {
+            val parent = current.parent
+            if (parent?.name == "main" && current.name in setOf("res", "assets")) {
+                return true
+            }
+            current = parent
+        }
+        return false
+    }
 
     protected inner class AndroidBuildTreeStructure : ProjectViewPaneTreeStructure(), AndroidBuildViewSettings
 
