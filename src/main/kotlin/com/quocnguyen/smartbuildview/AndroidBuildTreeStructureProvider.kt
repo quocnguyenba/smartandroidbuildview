@@ -124,6 +124,10 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
                 .map { it.toTreeNode() }
         )
         
+        findGithubFolder(project, settings)?.let { githubFolder ->
+            result.add(githubFolder)
+        }
+
         // Add folders outside of modules if showAllFolders is enabled
         if (fileSettings.showAllFolders) {
             val nonModuleFolders = findNonModuleFolders(project, allModules, settings)
@@ -139,6 +143,14 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
         }
         
         return result
+    }
+
+    private fun findGithubFolder(project: Project, viewSettings: ViewSettings?): AbstractTreeNode<*>? {
+        val basePath = project.basePath ?: return null
+        val baseDir = LocalFileSystem.getInstance().findFileByPath(basePath) ?: return null
+        val githubDir = baseDir.findChild(".github")?.takeIf { it.isDirectory } ?: return null
+        val psiDir = PsiManager.getInstance(project).findDirectory(githubDir) ?: return null
+        return GithubFolderNode(project, psiDir, viewSettings, "35_000_.github")
     }
 
     /**
@@ -158,7 +170,7 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
         baseDir.children
             .filter { it.isDirectory }
             .filter { it.path !in moduleRootPaths }
-            .filter { it.name !in setOf("build", ".gradle", ".idea", ".git", "src") }
+            .filter { it.name !in setOf("build", ".gradle", ".github", ".idea", ".git", "src") }
             .sortedBy { it.name }
             .forEachIndexed { index, dir ->
                 psiManager.findDirectory(dir)?.let { psiDir ->
