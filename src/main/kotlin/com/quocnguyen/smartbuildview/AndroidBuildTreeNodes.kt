@@ -458,16 +458,17 @@ class SortedFileNode(
     override fun getSortKey(): Comparable<*> = sortKey
 }
 
-class SortedDirNode(
+open class SortedDirNode(
     project: Project,
     private val dir: PsiDirectory,
     private val settings: ViewSettings?,
-    val sortKey: String
+    val sortKey: String,
+    private val icon: Icon = AllIcons.Nodes.Folder
 ) : ProjectViewNode<PsiDirectory>(project, dir, settings) {
 
     override fun update(presentation: PresentationData) {
         presentation.presentableText = dir.name
-        presentation.setIcon(AllIcons.Nodes.Folder)
+        presentation.setIcon(icon)
     }
 
     override fun getChildren(): Collection<AbstractTreeNode<*>> {
@@ -493,6 +494,13 @@ class SortedDirNode(
     override fun getSortKey(): Comparable<*> = sortKey
     override fun getTypeSortWeight(sortByType: Boolean): Int = 10  // Directories have lower weight
 }
+
+class GithubFolderNode(
+    project: Project,
+    dir: PsiDirectory,
+    settings: ViewSettings?,
+    sortKey: String
+) : SortedDirNode(project, dir, settings, sortKey, AllIcons.Vcs.Vendors.Github)
 
 // === ORIGINAL NODES (for compatibility) ===
 
@@ -974,7 +982,11 @@ class ExternalLibrariesNode(
             .map { (name, library) -> LibraryNode(project, name, library, settings) }
     }
 
-    override fun contains(file: VirtualFile): Boolean = false
+    override fun contains(file: VirtualFile): Boolean {
+        val project = myProject ?: return false
+        val fileIndex = com.intellij.openapi.roots.ProjectFileIndex.getInstance(project)
+        return fileIndex.isInLibrary(file)
+    }
     override fun getSortKey(): Comparable<*> = "ZZZZZ"  // After Gradle Scripts
     override fun getWeight(): Int = 3000  // Heavy weight to ensure it's last
 }
@@ -1001,17 +1013,21 @@ class LibraryNode(
     override fun getChildren(): Collection<AbstractTreeNode<*>> {
         val project = myProject ?: return emptyList()
         val classRoots = library.getFiles(OrderRootType.CLASSES)
+        val sourceRoots = library.getFiles(OrderRootType.SOURCES).filterNot { sourceRoot ->
+            classRoots.any { classRoot -> sourceRoot.path == classRoot.path }
+        }
+        val roots = classRoots + sourceRoots
 
         return when {
-            classRoots.isEmpty() -> emptyList()
-            classRoots.size == 1 -> {
-                // Single JAR – inline the package tree directly under the library node
-                buildPackageChildren(project, classRoots[0])
+            roots.isEmpty() -> emptyList()
+            roots.size == 1 -> {
+                // Single root – inline the package tree directly under the library node
+                buildPackageChildren(project, roots[0])
             }
             else -> {
-                // Multiple JARs – show one LibraryClassRootNode per JAR
+                // Multiple roots – show one LibraryClassRootNode per JAR/source root
                 val psiManager = PsiManager.getInstance(project)
-                classRoots.mapNotNull { root ->
+                roots.mapNotNull { root ->
                     psiManager.findDirectory(root)?.let { psiDir ->
                         // Use the JAR file name (parent of the "!/" virtual root)
                         val jarName = root.parent?.name ?: root.name
@@ -1043,7 +1059,10 @@ class LibraryNode(
         return children
     }
 
-    override fun contains(file: VirtualFile): Boolean = false
+    override fun contains(file: VirtualFile): Boolean {
+        val roots = library.getFiles(OrderRootType.CLASSES) + library.getFiles(OrderRootType.SOURCES)
+        return roots.any { root -> file.path.startsWith(root.path) }
+    }
 }
 
 /**
@@ -1077,4 +1096,6 @@ class LibraryClassRootNode(
 
     override fun contains(file: VirtualFile): Boolean =
         file.path.startsWith(rootDir.virtualFile.path)
+
+    override fun getSortKey(): Comparable<*> = rootName
 }
