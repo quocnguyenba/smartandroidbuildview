@@ -26,7 +26,10 @@ class AndroidBuildSettingsToolWindowFactory : ToolWindowFactory, DumbAware {
         toolWindow.contentManager.addContent(content)
     }
 
-    override fun shouldBeAvailable(project: Project): Boolean = true
+    // Only expose the settings tool window for Android projects, matching the
+    // visibility of the "Android + Build" project view it configures.
+    override fun shouldBeAvailable(project: Project): Boolean =
+        AndroidProjectDetector.isAndroidProject(project)
 }
 
 /**
