@@ -128,10 +128,13 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
             result.add(githubFolder)
         }
 
-        // Add folders outside of modules if showAllFolders is enabled
+        // Add folders outside of modules if showAllFolders is enabled.
+        // Group them under a single "Other Folders" section to avoid clutter.
         if (fileSettings.showAllFolders) {
-            val nonModuleFolders = findNonModuleFolders(project, allModules, settings)
-            result.addAll(nonModuleFolders)
+            val nonModuleFolders = findNonModuleFolders(project)
+            if (nonModuleFolders.isNotEmpty()) {
+                result.add(OtherFoldersGroupNode(project, nonModuleFolders, settings, "35"))
+            }
         }
         
         // Add Gradle Scripts (root project files) at the bottom
@@ -154,31 +157,30 @@ class AndroidBuildTreeStructureProvider : TreeStructureProvider, DumbAware {
     }
 
     /**
-     * Finds folders in the project root that are not part of any module.
+     * Finds folders in the project root that are not part of any module and that don't
+     * contain any module. Grouping folders (e.g. `feature/`) that hold child modules are
+     * excluded, since those modules are already shown in the hierarchy above.
      */
-    private fun findNonModuleFolders(project: Project, modules: List<Module>, viewSettings: ViewSettings?): List<AbstractTreeNode<*>> {
+    private fun findNonModuleFolders(project: Project): List<com.intellij.psi.PsiDirectory> {
         val basePath = project.basePath ?: return emptyList()
         val baseDir = LocalFileSystem.getInstance().findFileByPath(basePath)
             ?: return emptyList()
         
         val psiManager = PsiManager.getInstance(project)
-        val moduleRoots = modules.flatMap { ModuleRootManager.getInstance(it).contentRoots.toList() }
-        val moduleRootPaths = moduleRoots.map { it.path }.toSet()
-        
-        val folders = mutableListOf<AbstractTreeNode<*>>()
-        
-        baseDir.children
+        // Use every module in the project (not just the Gradle-filtered ones) so that we
+        // reliably detect any directory that hosts module content.
+        val moduleRootPaths = ModuleManager.getInstance(project).modules
+            .flatMap { ModuleRootManager.getInstance(it).contentRoots.toList() }
+            .map { it.path }
+
+        return baseDir.children
             .filter { it.isDirectory }
-            .filter { it.path !in moduleRootPaths }
+            // Exclude a folder if it is a module root itself, or if it contains a module
+            // (i.e. it is an ancestor of any module content root).
+            .filter { dir -> moduleRootPaths.none { it == dir.path || it.startsWith("${dir.path}/") } }
             .filter { it.name !in setOf("build", ".gradle", ".github", ".idea", ".git", "src") }
             .sortedBy { it.name }
-            .forEachIndexed { index, dir ->
-                psiManager.findDirectory(dir)?.let { psiDir ->
-                    folders.add(SortedDirNode(project, psiDir, viewSettings, "35_${String.format("%03d", index)}"))
-                }
-            }
-        
-        return folders
+            .mapNotNull { psiManager.findDirectory(it) }
     }
 
     private fun findProjectPrefix(modules: List<Module>): String {
