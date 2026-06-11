@@ -8,8 +8,10 @@ import com.intellij.ide.projectView.impl.ProjectAbstractTreeStructureBase
 import com.intellij.ide.projectView.impl.ProjectViewPane
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -63,6 +65,20 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
 
     // Hide Scratches and Consoles from this view
     override fun supportsShowScratchesAndConsoles(): Boolean = false
+
+    /**
+     * Only expose the "Android + Build" pane in the project view selector for projects
+     * that actually contain Android modules. For non-Android projects this view adds no
+     * value (and would hide regular folders), so we keep it out of the dropdown.
+     *
+     * Computed once and cached, since the project's Android-ness rarely changes at runtime.
+     */
+    override fun isInitiallyVisible(): Boolean {
+        return isAndroidProjectCached
+            ?: AndroidProjectDetector.isAndroidProject(myProject).also { isAndroidProjectCached = it }
+    }
+
+    private var isAndroidProjectCached: Boolean? = null
 
     private fun VFileEvent.isRelevantResourceCreateEvent(): Boolean {
         if (this !is VFileCreateEvent && this !is VFileCopyEvent) return false
@@ -119,6 +135,46 @@ class AndroidBuildViewPane(project: Project) : ProjectViewPane(project), DumbAwa
             override fun getWeight(): Float = this@AndroidBuildViewPane.weight.toFloat()
 
             override fun toString(): String = getTitle()
+        }
+    }
+}
+
+/**
+ * Detects whether a project should be treated as an Android project.
+ *
+ * Kept as a top-level object (rather than in an extension implementation's companion)
+ * so it can be shared by both the project view pane and the settings tool window.
+ */
+object AndroidProjectDetector {
+
+    /**
+     * Returns true if the project contains at least one Android module.
+     *
+     * Uses lightweight, index-free heuristics so it can run safely during project view
+     * setup: a module is considered Android if it has an `AndroidManifest.xml` under
+     * `src/main`, or its build script applies/declares the Android Gradle plugin (covers
+     * the `com.android.*` ids and the `android { }` configuration block, including
+     * version-catalog `alias(...)` usages).
+     */
+    fun isAndroidProject(project: Project): Boolean {
+        return ModuleManager.getInstance(project).modules.any { module ->
+            val dir = ModuleRootManager.getInstance(module).contentRoots.firstOrNull()
+                ?: return@any false
+
+            // Strong signal: a manifest in the standard Android source layout.
+            if (dir.findFileByRelativePath("src/main/AndroidManifest.xml") != null) return@any true
+
+            val buildFile = dir.findChild("build.gradle.kts")
+                ?: dir.findChild("build.gradle")
+                ?: return@any false
+
+            try {
+                val content = String(buildFile.contentsToByteArray())
+                content.contains("com.android") ||
+                    Regex("(^|\\s)android\\s*\\{").containsMatchIn(content)
+            } catch (_: Exception) {
+                false
+            }
         }
     }
 }

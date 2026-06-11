@@ -40,40 +40,58 @@ class AndroidBuildModuleNode(
         )
 
         /**
-         * Checks if a module is an Android application module by looking for
-         * the com.android.application plugin in its build.gradle file.
+         * Checks if a module is an Android application module by looking for the
+         * Android application Gradle plugin in its build script.
          */
-        fun isAndroidAppModule(moduleDir: VirtualFile?): Boolean {
-            if (moduleDir == null) return false
-            val buildFile = moduleDir.findChild("build.gradle.kts") 
-                ?: moduleDir.findChild("build.gradle")
-                ?: return false
-            
-            return try {
-                val content = String(buildFile.contentsToByteArray())
-                content.contains("com.android.application") || 
-                content.contains("id(\"com.android.application\")") ||
-                content.contains("id 'com.android.application'")
-            } catch (_: Exception) {
-                false
-            }
-        }
+        fun isAndroidAppModule(moduleDir: VirtualFile?): Boolean =
+            hasAndroidPlugin(moduleDir, "application")
 
         /**
-         * Checks if a module is an Android library module.
+         * Checks if a module is an Android library module by looking for the
+         * Android library Gradle plugin in its build script.
          */
-        fun isAndroidLibraryModule(moduleDir: VirtualFile?): Boolean {
+        fun isAndroidLibraryModule(moduleDir: VirtualFile?): Boolean =
+            hasAndroidPlugin(moduleDir, "library")
+
+        /**
+         * Checks if a module is an Android test module (e.g. a `com.android.test`
+         * micro/macrobenchmark module). Test modules render with the green Android
+         * icon in the Android view.
+         */
+        fun isAndroidTestModule(moduleDir: VirtualFile?): Boolean =
+            hasAndroidPlugin(moduleDir, "test")
+
+        /**
+         * Detects whether a module's build script applies the Android Gradle plugin of
+         * the given kind ("application", "library", "test", ...).
+         *
+         * Matches the common declaration styles so modules are coloured the same as in the
+         * Android view:
+         *  - plugin id form: `com.android.application` / `id("com.android.library")`
+         *  - version-catalog dotted alias: `alias(libs.plugins.android.application)`
+         *  - version-catalog camelCase alias: `alias(libs.plugins.androidLibrary)`
+         *
+         * Uses word boundaries so it does NOT incorrectly match identifiers that share a
+         * prefix (e.g. `android.testOptions`, `android.libraryVariants`,
+         * `androidTestImplementation`).
+         */
+        private fun hasAndroidPlugin(moduleDir: VirtualFile?, kind: String): Boolean {
             if (moduleDir == null) return false
-            val buildFile = moduleDir.findChild("build.gradle.kts") 
+            val buildFile = moduleDir.findChild("build.gradle.kts")
                 ?: moduleDir.findChild("build.gradle")
                 ?: return false
-            
+
             return try {
                 val content = String(buildFile.contentsToByteArray())
-                content.contains("com.android.library") || 
-                content.contains("id(\"com.android.library\")") ||
-                content.contains("id 'com.android.library'")
-            } catch (e: Exception) {
+                val camelKind = kind.replaceFirstChar { it.uppercase() }
+                // The dotted form catches both "com.android.<kind>" and the catalog alias
+                // "libs.plugins.android.<kind>"; the camelCase form catches catalog
+                // accessors like "libs.plugins.android<Kind>". \b ensures we stop at the
+                // end of the token so we don't match e.g. "android.testOptions".
+                val dotted = Regex("""android\.$kind\b""")
+                val camel = Regex("""android$camelKind\b""")
+                dotted.containsMatchIn(content) || camel.containsMatchIn(content)
+            } catch (_: Exception) {
                 false
             }
         }
@@ -85,6 +103,12 @@ class AndroidBuildModuleNode(
 
         private val androidLibraryIcon: Icon? by lazy {
             loadStudioIcon("Shell", "Filetree", "LIBRARY_MODULE")
+        }
+
+        // Used by `com.android.test` modules (e.g. macrobenchmark), matching what the
+        // Android view shows via AndroidIconProviderProjectGradleToken.
+        private val androidTestIcon: Icon? by lazy {
+            loadStudioIcon("Shell", "Filetree", "ANDROID_TEST_ROOT")
         }
 
         /**
@@ -111,6 +135,9 @@ class AndroidBuildModuleNode(
         fun getModuleIcon(moduleDir: VirtualFile?): Icon {
             return when {
                 isAndroidAppModule(moduleDir) -> androidAppIcon ?: AllIcons.Nodes.Module
+                // `com.android.test` modules (e.g. macrobenchmark) use the dedicated
+                // Android test-root icon in the Android view, not the green app icon.
+                isAndroidTestModule(moduleDir) -> androidTestIcon ?: AllIcons.Nodes.Module
                 isAndroidLibraryModule(moduleDir) -> androidLibraryIcon ?: AllIcons.Nodes.Module
                 else -> AllIcons.Nodes.Module
             }
@@ -175,9 +202,6 @@ class AndroidBuildModuleNode(
             }
         }
 
-        // Show all directories when showAllFolders is enabled
-        val shouldShowAllFolders = !isGradleModule || fileSettings.showAllFolders
-
         // Generated folders - build folder only (only for Gradle modules)
         if (isGradleModule && fileSettings.showGeneratedFolders) {
             moduleDir.findChild("build")?.let { dir ->
@@ -189,29 +213,29 @@ class AndroidBuildModuleNode(
             }
         }
 
-        // === ALL DIRECTORIES (sortKey: 10-39 for non-Gradle, 40-49 for additional) ===
-        if (shouldShowAllFolders) {
-            val excludedDirs = mutableSetOf("src", "build")
-            // For non-Gradle modules showing all content, don't exclude as much
-            if (!isGradleModule) {
-                excludedDirs.clear()
-                excludedDirs.add("build")  // Still exclude build directory
-            }
-            
+        // === EXTRA DIRECTORIES (non-Gradle modules only, sortKey 10-39) ===
+        // For Gradle modules we deliberately do NOT add an "Other Folders" group at the
+        // module level - those folders are shown via the project-root "Other Folders"
+        // section instead, keeping each module focused on its Android source groupings.
+        if (!isGradleModule) {
+            // Content roots of OTHER modules - skip these so nested module folders
+            // aren't duplicated inside this module's listing.
+            val otherModuleRootPaths = ModuleManager.getInstance(project).modules
+                .flatMap { ModuleRootManager.getInstance(it).contentRoots.toList() }
+                .map { it.path }
+                .filter { it != moduleDir.path }
+                .toSet()
+
             val allDirs = moduleDir.children
                 .filter { it.isDirectory }
-                .filter { it.name !in excludedDirs }
+                .filter { it.name != "build" }
+                // Skip directories that are (or contain) another module's content root
+                .filter { dir -> otherModuleRootPaths.none { it == dir.path || it.startsWith("${dir.path}/") } }
                 .sortedBy { it.name }
+                .mapNotNull { psiManager.findDirectory(it) }
 
-            // Use different sort key ranges based on context
-            val sortKeyPrefix = if (!isGradleModule) "10" else "40"
-            allDirs.forEachIndexed { index, dir ->
-                // Skip if already added as a source folder (for Gradle modules)
-                if (isGradleModule && dir.name == "src") return@forEachIndexed
-                
-                psiManager.findDirectory(dir)?.let { psiDir ->
-                    children.add(SortedDirNode(project, psiDir, settings, "${sortKeyPrefix}_${String.format("%03d", index)}"))
-                }
+            allDirs.forEachIndexed { index, psiDir ->
+                children.add(SortedDirNode(project, psiDir, settings, "10_${String.format("%03d", index)}"))
             }
         }
 
@@ -304,6 +328,7 @@ class AndroidBuildModuleNode(
                 is SortedSourceFolderGroupNode -> node.sortKey
                 is SortedFileNode -> node.sortKey
                 is SortedDirNode -> node.sortKey
+                is OtherFoldersGroupNode -> node.sortKey
                 else -> "ZZ"
             }
         }
@@ -501,6 +526,42 @@ class GithubFolderNode(
     settings: ViewSettings?,
     sortKey: String
 ) : SortedDirNode(project, dir, settings, sortKey, AllIcons.Vcs.Vendors.Github)
+
+/**
+ * Groups all the extra ("other") module folders under a single collapsible section
+ * so they don't clutter the module node directly. Shown when "Show all other folders"
+ * is enabled for a Gradle module.
+ */
+class OtherFoldersGroupNode(
+    project: Project,
+    private val dirs: List<PsiDirectory>,
+    private val settings: ViewSettings?,
+    val sortKey: String
+) : ProjectViewNode<String>(project, "Other Folders", settings) {
+
+    override fun update(presentation: PresentationData) {
+        presentation.presentableText = "Other Folders"
+        presentation.setIcon(AllIcons.Nodes.Folder)
+    }
+
+    override fun getChildren(): Collection<AbstractTreeNode<*>> {
+        val project = myProject ?: return emptyList()
+        return dirs.sortedBy { it.name }.mapIndexed { index, psiDir ->
+            SortedDirNode(project, psiDir, settings, "0_${String.format("%03d", index)}")
+        }
+    }
+
+    override fun contains(file: VirtualFile): Boolean =
+        dirs.any { file.path.startsWith(it.virtualFile.path) }
+
+    override fun getSortKey(): Comparable<*> = sortKey
+
+    // Weight lower than the default node weight (30) so this group floats to the
+    // very top of the tree, above module nodes which use the default weight.
+    // (At the module level, ordering is still driven by the string sortKey above,
+    //  because all sibling nodes there expose non-null sort keys.)
+    override fun getWeight(): Int = 0
+}
 
 // === ORIGINAL NODES (for compatibility) ===
 
